@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Offline Arcade</title>
+<style>
+  :root {
+    --paper: #f7f4ee;
+    --ink: #20262b;
+    --muted: #626a6f;
+    --line: #d9d1c3;
+    --accent: #e5724c;
+    --retro: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+    --bg: var(--paper);
+    --fg: var(--ink);
+    --sub: var(--muted);
+    --frame: rgba(32,38,43,.22);
+    --panel: #fffdfa;
+    --scan: rgba(32,38,43,.035);
+    --glow: rgba(229,114,76,.10);
+  }
+
+  body[data-theme="dark"] {
+    --bg: #171b1e;
+    --fg: #f7f4ee;
+    --sub: #aab2b7;
+    --frame: rgba(247,244,238,.24);
+    --panel: #20262b;
+    --scan: rgba(255,255,255,.035);
+    --glow: rgba(229,114,76,.18);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(circle at 50% -10%, var(--glow), transparent 60%),
+      radial-gradient(rgba(128,128,128,.055) 0.7px, transparent 0.7px);
+    background-size: auto, 6px 6px;
+    color: var(--fg);
+    font-family: var(--retro);
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(180deg, var(--scan) 0 1px, transparent 1px 4px);
+    z-index: 5;
+  }
+
+  .shell {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: clamp(22px, 4vh, 44px) clamp(14px, 3vw, 28px) 36px;
+  }
+
+  .marquee {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 18px;
+    margin-bottom: 22px;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  .eyebrow {
+    margin: 0 0 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .2em;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(30px, 5vw, 48px);
+    line-height: 1;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+  }
+
+  .count {
+    margin: 8px 0 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--sub);
+  }
+
+  .joystick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--fg);
+    font-family: var(--retro);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    cursor: pointer;
+  }
+
+  .base {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 2px solid var(--frame);
+    box-shadow: 0 4px 0 var(--frame);
+    display: grid;
+    place-items: center;
+  }
+
+  .stick {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid rgba(32,38,43,.65);
+    transform: translateY(-8px);
+    transition: transform 180ms ease;
+  }
+
+  .joystick[aria-checked="true"] .stick { transform: translateY(8px); }
+  .joystick:hover .base { border-color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: clamp(12px, 2vw, 22px);
+  }
+
+  a.game {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px 4px;
+    color: var(--fg);
+    text-decoration: none;
+    border-radius: 12px;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 5;
+    object-fit: cover;
+    border: 1px solid var(--frame);
+    border-radius: 10px;
+    background: #fbf9f4;
+    box-shadow: 0 3px 0 var(--frame);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  a.game:hover img {
+    transform: translateY(-4px);
+    box-shadow: 0 7px 16px rgba(0,0,0,.28);
+  }
+
+  .name {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    text-align: center;
+  }
+
+  a.game:hover .name { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .marquee { align-items: flex-start; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="marquee">
+    <div>
+      <p class="eyebrow">Offline arcade</p>
+      <h1>Retro Arcade</h1>
+      <p class="count">No connection · no install · no accounts</p>
+    </div>
+    <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights">
+      <span class="base" aria-hidden="true"><span class="stick"></span></span>
+      <span id="lightLabel">Lights off</span>
+    </button>
+  </header>
+
+  <main class="grid">
+    <a class="game" href="tetris/index.html"><img src="img/tetris.png" alt=""><span class="name">Tetris</span></a>
+    <a class="game" href="snake/index.html"><img src="img/snake.png" alt=""><span class="name">Snake</span></a>
+    <a class="game" href="breakout/index.html"><img src="img/breakout.png" alt=""><span class="name">Breakout</span></a>
+    <a class="game" href="invaders/index.html"><img src="img/space_invaders.png" alt=""><span class="name">Space Invaders</span></a>
+    <a class="game" href="asteroids/index.html"><img src="img/asteroids.png" alt=""><span class="name">Asteroids</span></a>
+    <a class="game" href="pong/index.html"><img src="img/pong1.png" alt=""><span class="name">Pong</span></a>
+    <a class="game" href="frogger/index.html"><img src="img/frogger.png" alt=""><span class="name">Frogger</span></a>
+    <a class="game" href="2048/index.html"><img src="img/2048.png" alt=""><span class="name">2048</span></a>
+    <a class="game" href="simon/index.html"><img src="img/simon.png" alt=""><span class="name">Simon</span></a>
+    <a class="game" href="pacman/index.html"><img src="img/pacman.png" alt=""><span class="name">Pac-Man</span></a>
+  </main>
+</div>
+
+<script>
+(() => {
+  const KEY = "arcade.theme.v1";
+  const btn = document.getElementById("lights");
+  const label = document.getElementById("lightLabel");
+
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    const on = theme === "light";
+    btn.setAttribute("aria-checked", String(on));
+    label.textContent = on ? "Lights on" : "Lights off";
+    try { localStorage.setItem(KEY, theme); } catch (_) {}
+  }
+
+  let saved = "dark";
+  try { saved = localStorage.getItem(KEY) || "dark"; } catch (_) {}
+  setTheme(saved === "light" ? "light" : "dark");
+
+  btn.addEventListener("click", () => {
+    setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>
