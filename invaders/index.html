@@ -452,6 +452,44 @@
   }
   .joystick[aria-checked="true"] .stick { transform: translateY(5px); }
   .joystick:hover { border-color: var(--accent); }
+
+  /* Phone-first play: controls always under the thumb, no keyboard prompts. */
+  @media (max-width: 760px) {
+    header .tagline { display: none !important; }
+    header h1 { font-size: 18px !important; }
+    .actions { flex-wrap: nowrap !important; justify-content: flex-end !important; gap: 4px !important; }
+    .actions button, .actions a.back { min-height: 36px !important; padding: 5px 7px !important; font-size: 10px !important; }
+    .joystick { width: 40px !important; height: 40px !important; min-height: 40px !important; }
+    .hud { padding: 6px 10px !important; gap: 6px !important; }
+    .chip { font-size: 10px !important; padding: 3px 7px !important; }
+    .legend, .help, .hint { display: none !important; }
+    .shell { padding-bottom: 120px !important; }
+    .side { display: block !important; max-height: none !important; overflow: visible !important; }
+    .side .panel.touch, .side .panel:has(.touch), .side .panel:has(.pad) {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      margin: 0;
+      padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+      border-radius: 16px 16px 0 0;
+      border-left: 0;
+      border-right: 0;
+      border-bottom: 0;
+      box-shadow: 0 -8px 22px rgba(0,0,0,.22);
+      max-height: none;
+    }
+    .side .panel.touch h2, .side .panel:has(.touch) h2, .side .panel:has(.pad) h2 { display: none; }
+    .touch, .pad { width: 100% !important; max-width: 480px; margin-inline: auto; gap: 10px !important; }
+    .touch button, .pad button {
+      min-height: 56px !important;
+      font-size: 18px !important;
+      border-radius: 12px !important;
+    }
+  }
+  /* Phone board sizing */
+  @media (max-width: 760px) { .board-wrap { width: min(100%, calc((100dvh - 220px) * 0.8421)) !important; margin-inline: auto; } }
 </style>
 </head>
 <body>
@@ -730,7 +768,7 @@
     popup("Wave 1", W / 2, H / 2, C.ink);
     announce("New game. Wave 1.");
     ready = true;
-    boardCanvas.focus();
+    boardCanvas.focus({ preventScroll: true });
   }
 
   // ---- Effects ----
@@ -1174,8 +1212,8 @@
       ctx.fillText(gameOver ? "Game over" : "Paused", W / 2, H / 2 - 8);
       ctx.font = "14px monospace";
       ctx.fillStyle = C.muted;
-      ctx.fillText(gameOver ? "Score " + score : "Press P to resume", W / 2, H / 2 + 22);
-      if (gameOver) ctx.fillText("Press R or New game to restart", W / 2, H / 2 + 46);
+      ctx.fillText(gameOver ? "Score " + score : "Tap Pause to resume", W / 2, H / 2 + 22);
+      if (gameOver) ctx.fillText("Tap New game to restart", W / 2, H / 2 + 46);
     }
   }
 
@@ -1200,7 +1238,7 @@
     input.dragging = true;
     targetFromPointer(e);
     fire();
-    boardCanvas.focus();
+    boardCanvas.focus({ preventScroll: true });
   });
 
   boardCanvas.addEventListener("pointermove", e => {
@@ -1269,8 +1307,8 @@
     if (e.key === " ") input.fire = false;
   });
 
-  pauseBtn.addEventListener("click", () => { togglePause(); boardCanvas.focus(); });
-  newBtn.addEventListener("click", () => { reset(); boardCanvas.focus(); });
+  pauseBtn.addEventListener("click", () => { togglePause(); boardCanvas.focus({ preventScroll: true }); });
+  newBtn.addEventListener("click", () => { reset(); boardCanvas.focus({ preventScroll: true }); });
 
   // ---- Start ----
   if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(boardCanvas);

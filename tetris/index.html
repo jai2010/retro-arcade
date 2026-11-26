@@ -473,6 +473,44 @@
   }
   .joystick[aria-checked="true"] .stick { transform: translateY(5px); }
   .joystick:hover { border-color: var(--accent); }
+
+  /* Phone-first play: controls always under the thumb, no keyboard prompts. */
+  @media (max-width: 760px) {
+    header .tagline { display: none !important; }
+    header h1 { font-size: 18px !important; }
+    .actions { flex-wrap: nowrap !important; justify-content: flex-end !important; gap: 4px !important; }
+    .actions button, .actions a.back { min-height: 36px !important; padding: 5px 7px !important; font-size: 10px !important; }
+    .joystick { width: 40px !important; height: 40px !important; min-height: 40px !important; }
+    .hud { padding: 6px 10px !important; gap: 6px !important; }
+    .chip { font-size: 10px !important; padding: 3px 7px !important; }
+    .legend, .help, .hint { display: none !important; }
+    .shell { padding-bottom: 120px !important; }
+    .side { display: block !important; max-height: none !important; overflow: visible !important; }
+    .side .panel.touch, .side .panel:has(.touch), .side .panel:has(.pad) {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      margin: 0;
+      padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+      border-radius: 16px 16px 0 0;
+      border-left: 0;
+      border-right: 0;
+      border-bottom: 0;
+      box-shadow: 0 -8px 22px rgba(0,0,0,.22);
+      max-height: none;
+    }
+    .side .panel.touch h2, .side .panel:has(.touch) h2, .side .panel:has(.pad) h2 { display: none; }
+    .touch, .pad { width: 100% !important; max-width: 480px; margin-inline: auto; gap: 10px !important; }
+    .touch button, .pad button {
+      min-height: 56px !important;
+      font-size: 18px !important;
+      border-radius: 12px !important;
+    }
+  }
+  /* Phone board sizing */
+  @media (max-width: 760px) { .board-wrap { width: min(100%, calc((100dvh - 360px) * 0.5000)) !important; margin-inline: auto; } }
 </style>
 </head>
 <body>
@@ -720,7 +758,7 @@
     spawnNext();
     updateStats();
     announce("New game");
-    boardCanvas.focus();
+    boardCanvas.focus({ preventScroll: true });
   }
 
   function cellsAt(type, rot, px, py) {
@@ -1001,7 +1039,7 @@
       boardCtx.fillText(gameOver ? "Game over" : "Paused", W / 2, H / 2 - 4);
       boardCtx.font = "14px monospace";
       boardCtx.fillStyle = "rgba(32,38,43,0.62)";
-      boardCtx.fillText(gameOver ? "Press R for a new game" : "Press P to resume", W / 2, H / 2 + 26);
+      boardCtx.fillText(gameOver ? "Tap New game" : "Tap Pause to resume", W / 2, H / 2 + 26);
     }
   }
 
@@ -1097,11 +1135,11 @@
   document.querySelectorAll("[data-action]").forEach(btn => {
     btn.addEventListener("click", () => {
       perform(btn.dataset.action);
-      boardCanvas.focus();
+      boardCanvas.focus({ preventScroll: true });
     });
   });
 
-  pauseBtn.addEventListener("click", () => { togglePause(); boardCanvas.focus(); });
+  pauseBtn.addEventListener("click", () => { togglePause(); boardCanvas.focus({ preventScroll: true }); });
   document.getElementById("newBtn").addEventListener("click", reset);
 
   const keyMap = {
