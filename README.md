@@ -34,9 +34,9 @@ No internet connection is required.
   and instructions on the right. On narrow screens the two columns stack.
 - On phones (including landscape), keyboard input and the on-screen button pads are
   hidden; play with swipe, drag and tap on the board. Pause and New game stay in the
-  header. The board is sized to the viewport in portrait and landscape, with a short
-  gesture cue in the leftover space. Keyboard controls and button pads still work on
-  larger screens.
+  header. The board is sized to the viewport in portrait and landscape. A short controls
+  tooltip appears on phones and closes with its × button; it is shown again on the next
+  visit. Keyboard controls and button pads still work on larger screens.
 - The home page uses `thumbs/*.png`, cropped from the supplied illustration grid.
   They are local files; nothing is fetched over the network.
 - No external fonts, images, audio, libraries or network calls are used.

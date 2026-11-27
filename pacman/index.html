@@ -252,7 +252,7 @@
 
   /* Phone layout: fit the board to the viewport, centre play, fill the rest with a cue. */
   .gesture-tip { display: none; }
-  html.no-touch-pad .shell { max-width: none !important; padding: 8px 8px 14px !important; }
+  html.no-touch-pad .shell { max-width: none !important; padding: 8px 4px 14px !important; }
   html.no-touch-pad header,
   html.no-touch-pad .game { width: 100% !important; max-width: none !important; }
   html.no-touch-pad .game { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; align-items: stretch !important; }
@@ -262,21 +262,42 @@
   html.no-touch-pad .board-width { width: min(100%, calc((100dvh - 170px) * 0.9048)) !important; margin-inline: auto !important; }
   html.no-touch-pad .side { display: none !important; }
   html.no-touch-pad .gesture-tip {
-    display: block;
-    margin: auto auto 0;
-    max-width: 420px;
-    padding: 8px 14px;
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 30;
+    align-items: center;
+    gap: 12px;
+    width: min(92vw, 420px);
+    max-width: min(92vw, 420px);
+    padding: 9px 10px 9px 14px;
     border: 1px solid rgba(128,128,128,.35);
-    border-radius: 999px;
+    border-radius: 14px;
+    background: var(--surface, #fffdfa);
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
     color: var(--muted, currentColor);
-    font: 11px/1.4 var(--retro-font, monospace);
+    font: 12px/1.35 var(--retro-font, monospace);
     text-align: center;
+  }
+  html.no-touch-pad .gesture-tip.is-open { display: flex; }
+  .tip-close {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(128,128,128,.35);
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font: 18px/1 monospace;
+    cursor: pointer;
   }
 
   @media (max-height: 520px) and (pointer: coarse) {
     html.no-touch-pad .board-wrap,
-    html.no-touch-pad .board-width { width: min(100%, calc((100dvh - 190px) * 0.9048)) !important; }
-    html.no-touch-pad .gesture-tip { margin-top: 6px !important; padding: 5px 12px !important; font-size: 10px !important; }
+    html.no-touch-pad .board-width { width: min(100%, calc((100dvh - 140px) * 0.9048)) !important; }
   }
 </style>
 </head>
@@ -308,7 +329,10 @@
       <div class="board-wrap">
         <canvas id="game" tabindex="0" role="img" aria-label="Pac-Man maze with pellets and four ghosts">Your browser does not support canvas.</canvas>
       </div>
-        <p class="gesture-tip">Swipe to turn · Tap the maze to start</p>
+        <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
+        <span>Swipe to turn · Tap the maze to start</span>
+        <button type="button" class="tip-close" aria-label="Close controls tip">×</button>
+      </div>
     </section>
 
     <aside class="side" aria-label="Instructions and touch controls">
@@ -332,12 +356,24 @@
   "use strict";
 
   // Keyboard play is desktop-only; phones use the touch controls.
+
+
   const phoneMode = window.matchMedia("(max-width: 760px)");
 
   // Phones play by gestures on the board, so hide the on-screen button pads.
   if (phoneMode.matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
       (navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches)) {
     document.documentElement.classList.add("no-touch-pad");
+  }
+  // Controls tip is a dismissible bubble, not a persistent part of the layout.
+  const tip = document.getElementById("controlsTip");
+  if (tip) {
+    tip.querySelector(".tip-close").addEventListener("click", () => {
+      tip.classList.remove("is-open");
+    });
+    if (document.documentElement.classList.contains("no-touch-pad")) {
+      tip.classList.add("is-open");
+    }
   }
 
   const TILE = 18;
