@@ -125,7 +125,7 @@
         <canvas id="game" class="board" tabindex="0" role="img" aria-label="Hill Climb Racer playfield: drive the sprung car over rolling hills and ramps">Your browser does not support canvas.</canvas>
       </div>
       <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
-        <span>Hold right to drive · Tap to flip when upside down · Dodge rocks and grab fuel</span>
+        <span>Hold right to drive · Tap to hop over rocks · Flip when upside down</span>
         <button type="button" class="tip-close" aria-label="Close controls tip">×</button>
       </div>
     </section>
@@ -137,7 +137,7 @@
       </section>
       <section class="panel">
         <h2>Touch</h2>
-        <p class="hint">Hold the right half to accelerate and the left half to brake or reverse. When the car flips over, a banner appears — tap anywhere to flip it upright.</p>
+        <p class="hint">Hold the right half to accelerate and the left half to brake or reverse. Tap to hop over rocks; when the car flips over, tap to flip it upright. Fuel cans refill, stars add bonus metres.</p>
       </section>
     </aside>
   </main>
@@ -213,7 +213,7 @@
 
   let car, cameraX, drift, score, best, flips, maxX, fuel, bonus, crashed;
   let started, paused, stuck, acc, lastTime;
-  let rocks = [], cans = [], stars = [], flipHintUntil = 0, crashReason = "";
+  let rocks = [], cans = [], stars = [], flipHintUntil = 0, crashReason = "", crashX = 0;
 
   // localStorage can be blocked for file:// pages; keep the best in memory then.
   function loadBest() {
@@ -281,6 +281,7 @@
     bonus = 0;
     crashed = false;
     crashReason = "";
+    crashX = 0;
     flipHintUntil = 0;
     buildCourse();
     stuck = false;
@@ -311,6 +312,18 @@
 
   function announce(text) { announceEl.textContent = text; }
 
+  function retry() {
+    car = newCar();
+    car.x = Math.max(START_X, crashX - 100);
+    car.y = terrainY(car.x) - (AXLE_Y + REST_LEN + WHEEL_R);
+    cameraX = car.x - 110;
+    crashed = false;
+    crashReason = "";
+    stuck = false;
+    started = true;
+    announce("Back on track");
+  }
+
   function start() {
     if (started) return;
     started = true;
@@ -326,11 +339,18 @@
   }
 
   function flip() {
-    if (crashed) { reset(); return; }
+    if (crashed) { retry(); return; }
     if (paused) return;
     start();
     if (!stuck && Math.abs(normAngle(car.a)) < 1.7) {
-      flipHintUntil = performance.now() + 1100;
+      const grounded = car.y > terrainY(car.x) - 46;
+      if (grounded && Math.abs(car.vx) > 20) {
+        car.vy -= 420;
+        car.av -= 0.4;
+        announce("Hop!");
+      } else {
+        flipHintUntil = performance.now() + 1100;
+      }
       return;
     }
     car.a = 0;
@@ -457,10 +477,11 @@
     if (!crashed) {
       for (const r of rocks) {
         if (r.hit || Math.abs(car.x - r.x) > r.r + 16) continue;
-        if (car.y + 10 > terrainY(r.x) - r.r * 1.4 && Math.abs(car.vx) > 60) {
+        if (car.y + 14 > terrainY(r.x) - r.r * 1.05 && Math.abs(car.vx) > 60) {
           r.hit = true;
           crashed = true;
           crashReason = "Crash!";
+          crashX = car.x;
           car.vx = 0; car.vy = 0; car.av = 0;
           announce("Crash! Tap to retry");
         }
@@ -484,7 +505,7 @@
 
   function update(dt) {
     drift += dt * (started && !paused ? 32 : 8);
-    if (!started || paused) return;
+    if (!started || paused || crashed) return;
     acc += dt;
     let steps = 0;
     while (acc >= STEP && steps < 8) { step(STEP); acc -= STEP; steps++; }
@@ -736,6 +757,10 @@
     let text = "";
     if (stuck) text = touchPhone() ? "TAP TO FLIP" : "SPACE TO FLIP";
     else if (performance.now() < flipHintUntil) text = touchPhone() ? "FLIP WHEN STUCK" : "SPACE WHEN STUCK";
+    else if (car.y > terrainY(car.x) - 46) {
+      const ahead = rocks.find(r => !r.hit && r.x > car.x && r.x - car.x < 180);
+      if (ahead) text = touchPhone() ? "TAP TO HOP" : "SPACE TO HOP";
+    }
     if (!text) return;
     ctx.font = "700 12px monospace";
     const w = Math.max(96, ctx.measureText(text).width + 24);
@@ -768,9 +793,9 @@
     ctx.font = "12px monospace";
     ctx.fillStyle = INK;
     const hint = crashed
-      ? "Tap the board to try again"
+      ? "Tap to retry from just before the rock"
       : !started
-        ? "Hold right to drive · Tap to flip when upside down"
+        ? "Hold right to drive · Tap to hop over rocks"
         : paused
           ? "Tap Pause to resume"
           : "Tap the board to flip upright";
