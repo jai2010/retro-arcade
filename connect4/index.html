@@ -167,8 +167,10 @@
   const OX = 14, OY = 92, W = 392, H = 470;
   const HUMAN = 1, MACHINE = 2;
   const KEY = "connect4.best.v1";
-  const INK = "#20262b";
-  const TEAL = "#3f9b91", CORAL = "#e5724c";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const scoreEl = document.getElementById("score");
@@ -329,65 +331,88 @@
     ctx.closePath();
   }
 
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
   function paintDisc(cx, cy, r, colour) {
-    ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.shadowColor = "rgba(32,38,43,0.22)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
     ctx.fillStyle = colour;
     ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[colour] || CREAM;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 0.9);
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,253,250,0.45)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(cx - r * 0.28, cy - r * 0.34, r * 0.26, r * 0.12, -0.5, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,253,250,0.62)";
-    ctx.fill();
-    ctx.restore();
+    // A small mark on each side keeps the players readable beyond colour.
+    ctx.fillStyle = colour === TEAL ? CREAM : GOLD;
+    if (colour === TEAL) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(cx - r * 0.24, cy - r * 0.07, r * 0.48, r * 0.14);
+    }
+  }
+
+  function drawOverlay(title, hint) {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, W - 20, H - 20);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK;
+    ctx.font = "700 24px ui-monospace, monospace";
+    ctx.fillText(title, W / 2, H / 2 - 12);
+    ctx.fillStyle = CORAL;
+    ctx.fillRect(W / 2 - 34, H / 2 - 2, 68, 3);
+    ctx.font = "12px ui-monospace, monospace";
+    ctx.fillStyle = INK;
+    ctx.fillText(hint, W / 2, H / 2 + 22);
   }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#f7f4ee";
+    ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
 
     roundRect(14, 12, W - 28, 62, 10);
-    ctx.fillStyle = "#fffdfa";
+    ctx.fillStyle = CREAM;
     ctx.fill();
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(14, 12, W - 28, 15);
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
     const active = turn === HUMAN ? TEAL : CORAL;
-    ctx.beginPath();
-    ctx.arc(38, 43, 11, 0, Math.PI * 2);
-    ctx.fillStyle = active;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = INK;
-    ctx.stroke();
+    paintDisc(38, 43, 11, active);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.font = "700 17px ui-monospace, monospace";
     ctx.fillStyle = INK;
     ctx.fillText(roundOver ? "Round over" : turn === HUMAN ? "Your turn" : "AI thinking", 60, 44);
     ctx.font = "11px ui-monospace, monospace";
-    ctx.fillStyle = "rgba(32,38,43,0.55)";
+    ctx.fillStyle = INK;
     ctx.fillText("7 × 6 · connect 4", 60, 61);
 
     roundRect(OX - 8, OY - 8, COLS * CELL + 16, ROWS * CELL + 16, 12);
-    ctx.fillStyle = "#ede7dc";
+    ctx.fillStyle = GOLD;
     ctx.fill();
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[GOLD];
+    ctx.fillRect(OX - 8, OY - 8, COLS * CELL + 16, (ROWS * CELL + 16) * 0.24);
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
 
@@ -395,21 +420,31 @@
       for (let col = 0; col < COLS; col++) {
         const cx = OX + col * CELL + CELL / 2;
         const cy = OY + row * CELL + CELL / 2;
+        const r = CELL * 0.39;
         ctx.beginPath();
-        ctx.arc(cx, cy, CELL * 0.39, 0, Math.PI * 2);
-        ctx.fillStyle = "#fffdfa";
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = CREAM;
         ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = "rgba(32,38,43,0.35)";
+        ctx.save();
+        ctx.clip();
+        ctx.fillStyle = PAPER;
+        ctx.fillRect(cx - r, cy - r, r * 2, r * 0.7);
+        ctx.restore();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = INK;
         ctx.stroke();
       }
     }
 
     if (!roundOver && !paused && started && hoverCol >= 0 && landing(hoverCol) >= 0) {
       const cx = OX + hoverCol * CELL + CELL / 2;
-      ctx.globalAlpha = 0.32;
-      paintDisc(cx, OY - 14, CELL * 0.38, turn === HUMAN ? TEAL : CORAL);
-      ctx.globalAlpha = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = turn === HUMAN ? TEAL : CORAL;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, OY - 14, CELL * 0.38, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     for (let row = 0; row < ROWS; row++) {
@@ -431,35 +466,30 @@
       const y1 = OY + Math.floor(first / COLS) * CELL + CELL / 2;
       const x2 = OX + (last % COLS) * CELL + CELL / 2;
       const y2 = OY + Math.floor(last / COLS) * CELL + CELL / 2;
-      ctx.strokeStyle = "rgba(229,114,76,0.85)";
-      ctx.lineWidth = 6;
       ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 9;
+      ctx.stroke();
+      ctx.strokeStyle = CORAL;
+      ctx.lineWidth = 5;
+      ctx.stroke();
     }
 
-    ctx.fillStyle = "rgba(32,38,43,0.45)";
+    ctx.fillStyle = INK;
     ctx.font = "11px ui-monospace, monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     ctx.fillText("1   2   3   4   5   6   7", W / 2, 444);
 
     if (paused || roundOver || !started) {
-      ctx.fillStyle = "rgba(247,244,238,0.89)";
-      ctx.fillRect(0, 0, W, H);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = INK;
-      ctx.font = "700 24px ui-monospace, monospace";
       const title = roundOver
         ? (result.who === HUMAN ? "You win!" : result.who === MACHINE ? "AI wins" : "Draw")
         : paused ? "Paused" : "Ready?";
-      ctx.fillText(title, W / 2, H / 2 - 12);
-      ctx.font = "12px ui-monospace, monospace";
-      ctx.fillStyle = "rgba(32,38,43,0.62)";
       const hint = roundOver ? (isPhone() ? "Tap to play again" : "Press R to play again")
         : paused ? (isPhone() ? "Tap Pause to resume" : "Press P to resume")
         : (isPhone() ? "Tap a column to begin" : "Enter or 1–7 to begin");
-      ctx.fillText(hint, W / 2, H / 2 + 18);
+      drawOverlay(title, hint);
     }
   }
 

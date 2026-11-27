@@ -623,10 +623,12 @@
   const BASE_SPEED = 230;
   const MAX_BOUNCE_ANGLE = Math.PI / 3;
   const BEST_KEY = "breakout.best.v1";
-  const INK = "#20262b";
-  const SHADOW = "rgba(32,38,43,0.18)";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
 
-  const ROW_COLORS = ["#e5724c", "#e6b34d", "#ede7dc", "#3f9b91", "#4d7bb0"];
+  const ROW_COLORS = [CORAL, GOLD, TEAL, CORAL, GOLD];
 
   const boardCanvas = document.getElementById("board");
   const boardWrap = document.getElementById("boardWrap");
@@ -894,52 +896,71 @@
     ctx.closePath();
   }
 
-  // Palette fill, ink outline, soft shadow and a top gloss for every solid object.
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
   function paintRoundRect(ctx, x, y, w, h, r, color) {
     roundRect(ctx, x, y, w, h, r);
-    ctx.shadowColor = SHADOW;
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.shadowColor = "rgba(32,38,43,0)";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(x, y, w, Math.max(2, h * 0.24));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    ctx.fillStyle = "rgba(255,253,250,0.4)";
-    roundRect(ctx, x + 4, y + 3, Math.max(2, w - 8), 4, 2);
-    ctx.fill();
   }
 
   function paintBall(x, y, radius, color) {
     boardCtx.beginPath();
     boardCtx.arc(x, y, radius, 0, Math.PI * 2);
-    boardCtx.shadowColor = SHADOW;
-    boardCtx.shadowBlur = 6;
-    boardCtx.shadowOffsetY = 3;
     boardCtx.fillStyle = color;
     boardCtx.fill();
-    boardCtx.shadowColor = "rgba(32,38,43,0)";
-    boardCtx.shadowBlur = 0;
-    boardCtx.shadowOffsetY = 0;
+    boardCtx.save();
+    boardCtx.clip();
+    boardCtx.fillStyle = TINTS[color] || CREAM;
+    boardCtx.fillRect(x - radius, y - radius, radius * 2, Math.max(2, radius * 0.9));
+    boardCtx.restore();
     boardCtx.lineWidth = 2;
+    boardCtx.lineJoin = "round";
     boardCtx.strokeStyle = INK;
     boardCtx.stroke();
-    boardCtx.beginPath();
-    boardCtx.arc(x - 2, y - 2, 1.6, 0, Math.PI * 2);
-    boardCtx.fillStyle = "rgba(255,253,250,0.8)";
-    boardCtx.fill();
+  }
+
+  // Small ink marks keep the repeating row colours distinct.
+  function paintBrickMark(brick) {
+    const cx = brick.x + brick.w / 2;
+    const cy = brick.y + brick.h / 2;
+    boardCtx.fillStyle = INK;
+    boardCtx.strokeStyle = INK;
+    boardCtx.lineWidth = 1.5;
+    boardCtx.lineCap = "round";
+    if (brick.row % 3 === 0) {
+      boardCtx.beginPath();
+      boardCtx.arc(cx, cy, 2, 0, Math.PI * 2);
+      boardCtx.fill();
+    } else if (brick.row % 3 === 1) {
+      boardCtx.beginPath();
+      boardCtx.moveTo(cx - 5, cy);
+      boardCtx.lineTo(cx + 5, cy);
+      boardCtx.stroke();
+    } else {
+      boardCtx.beginPath();
+      boardCtx.moveTo(cx - 4, cy - 2);
+      boardCtx.lineTo(cx, cy + 3);
+      boardCtx.lineTo(cx + 4, cy - 2);
+      boardCtx.stroke();
+    }
   }
 
   function drawBoard(now) {
-    boardCtx.clearRect(0, 0, W, H);
-    boardCtx.fillStyle = "#fffdfa";
+    boardCtx.fillStyle = PAPER;
     boardCtx.fillRect(0, 0, W, H);
 
-    boardCtx.strokeStyle = "rgba(32,38,43,0.05)";
-    boardCtx.lineWidth = 1;
+    boardCtx.strokeStyle = "rgba(32,38,43,0.10)";
+    boardCtx.lineWidth = 1.5;
     for (let x = 40; x < W; x += 40) {
       boardCtx.beginPath();
       boardCtx.moveTo(x + 0.5, 0);
@@ -956,41 +977,47 @@
     for (const brick of bricks) {
       if (!brick.alive) continue;
       paintRoundRect(boardCtx, brick.x, brick.y, brick.w, brick.h, 5, brick.color);
+      paintBrickMark(brick);
     }
 
-    paintRoundRect(boardCtx, paddleX - PADDLE_W / 2, PADDLE_Y, PADDLE_W, PADDLE_H, 6, "#4d7bb0");
+    paintRoundRect(boardCtx, paddleX - PADDLE_W / 2, PADDLE_Y, PADDLE_W, PADDLE_H, 6, TEAL);
 
-    paintBall(ball.x, ball.y, BALL_R, "#e5724c");
+    paintBall(ball.x, ball.y, BALL_R, CORAL);
 
     if (ball.stuck && !paused && !gameOver) {
-      boardCtx.fillStyle = "rgba(32,38,43,0.62)";
+      boardCtx.fillStyle = INK;
       boardCtx.font = "13px monospace";
       boardCtx.textAlign = "center";
       boardCtx.fillText("Tap to launch", W / 2, PADDLE_Y - 22);
     }
 
     if (bannerText && now < bannerUntil) {
-      boardCtx.globalAlpha = reducedMotion ? 1 : Math.min(1, (bannerUntil - now) / 300);
-      boardCtx.fillStyle = "#20262b";
+      boardCtx.fillStyle = INK;
       boardCtx.font = "700 24px monospace";
       boardCtx.textAlign = "center";
       boardCtx.fillText(bannerText, W / 2, H / 2);
-      boardCtx.globalAlpha = 1;
+      boardCtx.fillStyle = CORAL;
+      boardCtx.fillRect(W / 2 - 34, H / 2 + 8, 68, 3);
     }
 
     if (paused || gameOver) {
-      boardCtx.fillStyle = "rgba(255,253,250,0.88)";
+      boardCtx.fillStyle = PAPER;
       boardCtx.fillRect(0, 0, W, H);
-      boardCtx.fillStyle = "#20262b";
+      boardCtx.strokeStyle = INK;
+      boardCtx.lineWidth = 4;
+      boardCtx.strokeRect(10, 10, W - 20, H - 20);
+      boardCtx.fillStyle = INK;
       boardCtx.font = "700 28px monospace";
       boardCtx.textAlign = "center";
       boardCtx.fillText(gameOver ? "Game over" : "Paused", W / 2, H / 2 - 4);
+      boardCtx.fillStyle = CORAL;
+      boardCtx.fillRect(W / 2 - 34, H / 2 + 6, 68, 3);
       boardCtx.font = "14px monospace";
-      boardCtx.fillStyle = "rgba(32,38,43,0.62)";
+      boardCtx.fillStyle = INK;
       boardCtx.fillText(
         gameOver ? "Tap New game to restart" : "Tap Pause to resume",
         W / 2,
-        H / 2 + 26
+        H / 2 + 30
       );
     }
   }

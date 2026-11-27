@@ -177,8 +177,11 @@
   const GRID = 9;
   const MINES = 10;
   const KEY = "minesweeper.best.v1";
-  const INK = "#20262b";
-  const NUM_COLORS = ["#3f9b91", "#4d7bb0", "#e5724c", "#e6b34d", "#20262b", "#3f9b91", "#4d7bb0", "#e5724c"];
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
+  const NUM_COLORS = [TEAL, CORAL, GOLD, INK, TEAL, CORAL, GOLD, INK];
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -380,9 +383,29 @@
     ctx.closePath();
   }
 
+  function drawOverlay(title, hint) {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, W - 20, H - 20);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK;
+    ctx.font = "700 " + Math.max(17, Math.min(26, W * 0.065)) + "px monospace";
+    ctx.fillText(title, W / 2, H / 2 - 6);
+    ctx.fillStyle = CORAL;
+    ctx.fillRect(W / 2 - 34, H / 2 + 4, 68, 3);
+    ctx.font = Math.max(9, Math.min(13, W * 0.03)) + "px monospace";
+    ctx.fillStyle = INK;
+    hint.split(" — ").forEach((part, i) => {
+      ctx.fillText(part, W / 2, H / 2 + 28 + i * 16);
+    });
+  }
+
   function drawFlag(cx, cy, s) {
     ctx.strokeStyle = INK;
-    ctx.lineWidth = Math.max(1.5, s * 0.09);
+    ctx.lineWidth = Math.max(2, s * 0.1);
     ctx.beginPath();
     ctx.moveTo(cx - s * 0.14, cy + s * 0.55);
     ctx.lineTo(cx - s * 0.14, cy - s * 0.58);
@@ -392,10 +415,16 @@
     ctx.lineTo(cx + s * 0.55, cy - s * 0.28);
     ctx.lineTo(cx - s * 0.14, cy + s * 0.05);
     ctx.closePath();
-    ctx.fillStyle = "#e5724c";
+    ctx.fillStyle = CORAL;
     ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[CORAL];
+    ctx.fillRect(cx - s * 0.14, cy - s * 0.58, s * 0.69, s * 0.22);
+    ctx.restore();
+    ctx.lineWidth = Math.max(2, s * 0.08);
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
-    ctx.lineWidth = Math.max(1, s * 0.06);
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(cx - s * 0.42, cy + s * 0.58);
@@ -405,39 +434,55 @@
 
   function drawMine(cx, cy, s) {
     ctx.strokeStyle = INK;
-    ctx.lineWidth = Math.max(1.5, s * 0.09);
+    ctx.lineWidth = Math.max(2, s * 0.12);
+    ctx.lineCap = "round";
     for (let i = 0; i < 8; i++) {
       const a = i * Math.PI / 4;
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(a) * s * 0.38, cy + Math.sin(a) * s * 0.38);
-      ctx.lineTo(cx + Math.cos(a) * s * 0.66, cy + Math.sin(a) * s * 0.66);
+      ctx.lineTo(cx + Math.cos(a) * s * 0.72, cy + Math.sin(a) * s * 0.72);
       ctx.stroke();
     }
     ctx.beginPath();
     ctx.arc(cx, cy, s * 0.42, 0, Math.PI * 2);
-    ctx.fillStyle = INK;
+    ctx.fillStyle = CORAL;
     ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[CORAL];
+    ctx.fillRect(cx - s * 0.42, cy - s * 0.42, s * 0.84, s * 0.4);
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
     ctx.beginPath();
     ctx.arc(cx - s * 0.13, cy - s * 0.14, s * 0.1, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,253,250,0.85)";
+    ctx.fillStyle = CREAM;
     ctx.fill();
   }
 
   function draw() {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
     if (!board.length) return;
-    ctx.clearRect(0, 0, W, H);
     const cw = W / GRID, ch = H / GRID;
     const pad = Math.min(cw, ch) * 0.045;
     const bw = cw - pad * 2, bh = ch - pad * 2;
     const radius = Math.min(cw, ch) * 0.14;
 
+    ctx.strokeStyle = "rgba(32,38,43,0.10)";
+    ctx.lineWidth = 1.5;
+    for (let i = 1; i < GRID; i++) {
+      ctx.beginPath(); ctx.moveTo(i * cw + .5, 0); ctx.lineTo(i * cw + .5, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * ch + .5); ctx.lineTo(W, i * ch + .5); ctx.stroke();
+    }
+
     if (!isPhone) {
       const r = Math.floor(cursor / GRID), c = cursor % GRID;
       roundRect(c * cw + pad * 0.4, r * ch + pad * 0.4, cw - pad * 0.8, ch - pad * 0.8, radius);
-      ctx.fillStyle = "rgba(229,114,76,0.08)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(229,114,76,0.55)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = CORAL;
+      ctx.lineWidth = 3;
       ctx.stroke();
     }
 
@@ -447,38 +492,54 @@
         const x = c * cw + pad, y = r * ch + pad;
         roundRect(x, y, bw, bh, radius);
         if (cell.revealed) {
-          ctx.fillStyle = "#ede7dc";
+          ctx.fillStyle = PAPER;
           ctx.fill();
-          ctx.strokeStyle = "rgba(32,38,43,0.24)";
-          ctx.lineWidth = 1;
+          ctx.save();
+          ctx.clip();
+          ctx.fillStyle = CREAM;
+          ctx.fillRect(x, y, bw, bh * 0.24);
+          ctx.restore();
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = 2.5;
+          ctx.lineJoin = "round";
           ctx.stroke();
           if (cell.mine) drawMine(x + bw / 2, y + bh / 2, Math.min(bw, bh) * 0.46);
           else if (cell.count > 0) {
-            ctx.fillStyle = NUM_COLORS[cell.count - 1];
-            ctx.font = "700 " + Math.round(Math.min(bw, bh) * 0.56) + "px monospace";
+            const colour = NUM_COLORS[cell.count - 1];
+            ctx.fillStyle = colour;
+            ctx.font = "700 " + Math.round(Math.min(bw, bh) * 0.5) + "px monospace";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(String(cell.count), x + bw / 2, y + bh / 2 + Math.min(bw, bh) * 0.03);
+            ctx.fillText(String(cell.count), x + bw / 2, y + bh * 0.45);
+            // Count dots make each number read by pattern as well as colour.
+            ctx.fillStyle = colour === INK ? CREAM : INK;
+            const gap = Math.min(bw, bh) * 0.09;
+            for (let i = 0; i < cell.count; i++) {
+              ctx.beginPath();
+              ctx.arc(x + bw / 2 + (i - (cell.count - 1) / 2) * gap, y + bh * 0.76, Math.min(bw, bh) * 0.028, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
         } else {
-          ctx.fillStyle = "#fffdfa";
-          ctx.shadowColor = "rgba(32,38,43,0.18)";
-          ctx.shadowBlur = 5;
-          ctx.shadowOffsetY = 2;
+          ctx.fillStyle = CREAM;
           ctx.fill();
-          ctx.shadowColor = "rgba(32,38,43,0)";
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetY = 0;
+          ctx.save();
+          ctx.clip();
+          ctx.fillStyle = TINTS[GOLD];
+          ctx.fillRect(x, y, bw, bh * 0.22);
+          ctx.restore();
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = 2.5;
+          ctx.lineJoin = "round";
+          ctx.stroke();
+          roundRect(x + bw * 0.12, y + bh * 0.12, bw * 0.76, bh * 0.76, radius * 0.6);
           ctx.strokeStyle = INK;
           ctx.lineWidth = 1.5;
           ctx.stroke();
-          ctx.fillStyle = "rgba(255,253,250,0.55)";
-          roundRect(x + bw * 0.14, y + bh * 0.1, bw * 0.72, bh * 0.12, bh * 0.06);
-          ctx.fill();
           if (cell.flagged) drawFlag(x + bw / 2, y + bh / 2, Math.min(bw, bh) * 0.52);
           if (cell.wrong) {
-            ctx.strokeStyle = "#e5724c";
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = CORAL;
+            ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(x + bw * 0.22, y + bh * 0.22);
             ctx.lineTo(x + bw * 0.78, y + bh * 0.78);
@@ -491,10 +552,6 @@
     }
 
     if (paused || phase === "idle" || phase === "over" || phase === "won") {
-      ctx.fillStyle = "rgba(255,253,250,0.90)";
-      ctx.fillRect(0, 0, W, H);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
       const secs = Math.floor(elapsed);
       const title = phase === "over" ? "Boom!" : phase === "won" ? (newRecord ? "New record!" : "Cleared!") : paused ? "Paused" : "Ready?";
       let hint;
@@ -502,12 +559,7 @@
       else if (phase === "won") hint = secs + "s · best " + best + "s — " + (isPhone ? "tap to play again" : "press R or tap to play again");
       else if (paused) hint = "Tap Pause to resume";
       else hint = isPhone ? "Tap a square to begin" : "Tap a square or press Enter to begin";
-      ctx.fillStyle = INK;
-      ctx.font = "700 " + Math.max(17, Math.min(26, W * 0.065)) + "px monospace";
-      ctx.fillText(title, W / 2, H / 2 - 6);
-      ctx.font = Math.max(9, Math.min(13, W * 0.03)) + "px monospace";
-      ctx.fillStyle = "rgba(32,38,43,0.62)";
-      ctx.fillText(hint, W / 2, H / 2 + 20);
+      drawOverlay(title, hint);
     }
   }
 

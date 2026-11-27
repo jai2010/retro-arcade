@@ -622,6 +622,10 @@
   const AI_SPEED_FRAC = 0.62;   // AI paddle speed / field height, per second
   const AI_ERROR_FRAC = 0.55;   // aim error as a fraction of paddle height
   const BEST_KEY = "pong.best.v1";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
 
   const canvas = document.getElementById("board");
   const boardWrap = document.getElementById("boardWrap");
@@ -871,61 +875,73 @@
     path.closePath();
   }
 
-  // Soft shadow during fill, ink outline, then a small top gloss.
-  function inkedShape(path, color, gloss, lineWidth) {
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
+  function inkedShape(path, color, band, lineWidth) {
     ctx.save();
     ctx.fillStyle = color;
-    ctx.shadowColor = "rgba(32,38,43,.18)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
     ctx.fill(path);
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.strokeStyle = "#20262b";
-    ctx.lineWidth = lineWidth || 2;
-    ctx.lineJoin = "round";
-    ctx.stroke(path);
-    if (gloss) {
-      ctx.fillStyle = "rgba(255,253,250,.8)";
-      ctx.fill(gloss);
+    if (band) {
+      ctx.save();
+      ctx.clip(path);
+      ctx.fillStyle = TINTS[color] || CREAM;
+      ctx.fillRect(band.x, band.y, band.w, band.h);
+      ctx.restore();
     }
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = lineWidth || 3;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.stroke(path);
     ctx.restore();
   }
 
   function drawPaddle(x, yCenter, color) {
     const r = Math.min(6, padW / 2);
+    const top = yCenter - padH / 2;
     const path = new Path2D();
-    roundRectPath(path, x, yCenter - padH / 2, padW, padH, r);
-    const gloss = new Path2D();
-    roundRectPath(gloss,
-      x + Math.max(1.5, padW * 0.2), yCenter - padH / 2 + 4,
-      Math.max(1.5, padW * 0.3), Math.max(6, padH * 0.3),
-      Math.max(0.8, padW * 0.14));
-    inkedShape(path, color, gloss, 2);
+    roundRectPath(path, x, top, padW, padH, r);
+    inkedShape(path, color, { x, y: top, w: padW, h: Math.max(2, padH * 0.24) }, 3);
+    // A cream mark on each paddle keeps the two sides distinct beyond colour.
+    ctx.fillStyle = CREAM;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.5;
+    if (color === CORAL) {
+      ctx.beginPath();
+      ctx.arc(x + padW / 2, yCenter, Math.max(1.6, padW * 0.22), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(x, yCenter - 1, padW, 2);
+      ctx.strokeRect(x, yCenter - 1, padW, 2);
+    }
   }
 
-  function drawOverlay(title, subtitle, accentTitle) {
-    ctx.fillStyle = "rgba(247,244,238,0.88)";
+  function drawOverlay(title, subtitle) {
+    ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, W - 20, H - 20);
     ctx.textAlign = "center";
-    ctx.fillStyle = accentTitle ? "#e5724c" : "#20262b";
+    ctx.fillStyle = INK;
     ctx.font = "700 " + Math.round(clamp(W * 0.09, 17, 30)) + "px monospace";
-    ctx.fillText(title, W / 2, H / 2 - 6);
-    ctx.fillStyle = "rgba(32,38,43,.62)";
+    ctx.fillText(title, W / 2, H / 2 - 10);
+    ctx.fillStyle = CORAL;
+    ctx.fillRect(W / 2 - 34, H / 2, 68, 3);
+    ctx.fillStyle = INK;
     ctx.font = Math.round(clamp(W * 0.038, 11, 14)) + "px monospace";
-    ctx.fillText(subtitle, W / 2, H / 2 + 24);
+    ctx.fillText(subtitle, W / 2, H / 2 + 26);
   }
 
   function draw() {
     if (!W || !H) return;
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#fffdfa";
+    ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
 
-    // Half-court line and centre ring.
-    ctx.strokeStyle = "rgba(32,38,43,0.09)";
-    ctx.lineWidth = 2;
+    // Half-court line and centre ring: faint ink gauges on solid paper.
+    ctx.strokeStyle = "rgba(32,38,43,0.10)";
+    ctx.lineWidth = 1.5;
     ctx.setLineDash([8, 10]);
     ctx.beginPath();
     ctx.moveTo(W / 2 + 0.5, 0);
@@ -936,25 +952,24 @@
     ctx.arc(W / 2, H / 2, Math.max(14, W * 0.07), 0, Math.PI * 2);
     ctx.stroke();
 
-    drawPaddle(padX, playerY, "#e5724c");
-    drawPaddle(W - padX - padW, aiY, "#3f9b91");
+    drawPaddle(padX, playerY, CORAL);
+    drawPaddle(W - padX - padW, aiY, TEAL);
 
     const ballPath = new Path2D();
     ballPath.arc(ball.x, ball.y, ballR, 0, Math.PI * 2);
-    const ballGloss = new Path2D();
-    ballGloss.arc(ball.x - ballR * 0.3, ball.y - ballR * 0.32, Math.max(1, ballR * 0.32), 0, Math.PI * 2);
-    inkedShape(ballPath, "#fffdfa", ballGloss, 2);
+    inkedShape(ballPath, GOLD, {
+      x: ball.x - ballR, y: ball.y - ballR, w: ballR * 2, h: Math.max(2, ballR * 0.9)
+    }, 2);
 
     if (roundOver) {
       drawOverlay(scoreYou > scoreAi ? "You win the round" : "AI wins the round",
-        wins + " wins · " + losses + " losses — tap to play again", true);
+        wins + " wins · " + losses + " losses — tap to play again");
     } else if (paused) {
-      drawOverlay("Paused", phoneMode.matches ? "Tap Pause to resume" : "Tap or press P to resume", false);
+      drawOverlay("Paused", phoneMode.matches ? "Tap Pause to resume" : "Tap or press P to resume");
     } else if (!started) {
-      drawOverlay("Pong", "Tap to start", false);
+      drawOverlay("Pong", "Tap to start");
     } else if (awaitingServe) {
-      drawOverlay(lastPointToYou ? "Point to you" : "Point to AI",
-        "Tap to serve", false);
+      drawOverlay(lastPointToYou ? "Point to you" : "Point to AI", "Tap to serve");
     }
   }
 

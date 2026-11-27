@@ -645,11 +645,17 @@
   const MAX_BULLETS = 3;
   const BEST_KEY = "invaders.best.v1";
 
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
   const C = {
-    ink: "#20262b", muted: "rgba(32,38,43,.62)", accent: "#e5724c",
-    accentDark: "#20262b", teal: "#3f9b91", amber: "#e6b34d", blue: "#4d7bb0",
-    sand: "#ede7dc", line: "#ede7dc", surface: "#fffdfa", board: "#fffdfa"
+    ink: INK, muted: INK, accent: CORAL,
+    accentDark: INK, teal: TEAL, amber: GOLD, blue: TEAL,
+    sand: PAPER, line: INK, surface: CREAM, board: PAPER
   };
+  // Four alien ranks: palette colours plus a rank mark, never colour alone.
+  const ALIEN_COLORS = [CORAL, GOLD, TEAL, CORAL];
 
   // Small pixel sprites, drawn as filled cells in world units.
   const ALIEN_FRAMES = [
@@ -795,7 +801,7 @@
     aliens = [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        aliens.push({ col: c, row: r, alive: true, color: r < 2 ? C.accent : C.teal });
+        aliens.push({ col: c, row: r, alive: true, color: ALIEN_COLORS[r] });
       }
     }
   }
@@ -1121,7 +1127,7 @@
   }
 
   // ---- Rendering ----
-  // Rounded pixel cells with a soft paper shadow, ink outline and top gloss.
+  // Rounded pixel cells, inked as one shape around the outside of the grid.
   function roundRectPath(path, x, y, w, h, r) {
     path.moveTo(x + r, y);
     path.arcTo(x + w, y, x + w, y + h, r);
@@ -1131,25 +1137,24 @@
     path.closePath();
   }
 
-  function inkedFill(path, color, gloss, outline) {
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
+  function inkedFill(path, color, band, outline, lineWidth) {
     ctx.save();
     ctx.fillStyle = color;
-    ctx.shadowColor = "rgba(32,38,43,.18)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
     ctx.fill(path);
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.strokeStyle = C.ink;
-    ctx.lineWidth = 2;
+    if (band) {
+      ctx.save();
+      ctx.clip(path);
+      ctx.fillStyle = TINTS[color] || CREAM;
+      ctx.fillRect(band.x, band.y, band.w, band.h);
+      ctx.restore();
+    }
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = lineWidth || 3;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.stroke(outline || path);
-    if (gloss) {
-      ctx.fillStyle = "rgba(255,253,250,.8)";
-      ctx.fill(gloss);
-    }
     ctx.restore();
   }
 
@@ -1176,25 +1181,50 @@
     gridPaths(frame[0].length, frame.length, 3, 0, 0, (r, c) => !!frame[r] && frame[r][c] === "1"));
   const SHIP_PATH = gridPaths(SHIP_SPRITE[0].length, SHIP_SPRITE.length, 3, 0, 0,
     (r, c) => !!SHIP_SPRITE[r] && SHIP_SPRITE[r][c] === "1");
-  const ALIEN_GLOSS = new Path2D();
-  roundRectPath(ALIEN_GLOSS, 7.5, 0.9, 6, 1.2, 0.6);
-  const SHIP_GLOSS = new Path2D();
-  roundRectPath(SHIP_GLOSS, 12.4, 0.5, 2.2, 1.6, 0.8);
+  const ALIEN_BAND = { x: 0, y: 0, w: 24, h: 4 };
+  const SHIP_BAND = { x: 0, y: 0, w: 27, h: 3.5 };
+
+  // Rank marks: dots and dashes, so alien types read without relying on colour.
+  function alienRankMark(row) {
+    ctx.fillStyle = INK;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    const y = 7.5;
+    if (row % 2 === 0) {
+      const xs = row === 0 ? [12] : [8, 12, 16];
+      for (const x of xs) {
+        ctx.beginPath();
+        ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(9, y);
+      ctx.lineTo(row === 1 ? 15 : 19, y);
+      ctx.stroke();
+    }
+  }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = C.board;
+    ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
 
-    // Ground line.
-    ctx.strokeStyle = "rgba(32,38,43,0.28)";
-    ctx.lineWidth = 1;
+    // Faint gauge lines, then the ground line.
+    ctx.strokeStyle = "rgba(32,38,43,0.10)";
+    ctx.lineWidth = 1.5;
+    for (let x = 40; x < W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); ctx.stroke();
+    }
+    for (let y = 40; y < H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke();
+    }
     ctx.beginPath();
     ctx.moveTo(6, PLAYER_Y + PLAYER_H + 6.5);
     ctx.lineTo(W - 6, PLAYER_Y + PLAYER_H + 6.5);
     ctx.stroke();
 
-    // Bunkers: chunky rounded cells inked as one soft shape each.
+    // Bunkers: chunky rounded cells inked as one shape each, with a teal top band.
     for (const shield of shields) {
       const cols = SHIELD_SHAPE[0].length;
       const grid = [];
@@ -1209,17 +1239,21 @@
       }
       const shape = gridPaths(cols, SHIELD_SHAPE.length, SHIELD_CELL, shield.cells[0].x,
         shield.cells[0].y, (r, c) => !!grid[r] && grid[r][c]);
-      inkedFill(shape.body, C.teal, null, shape.outline);
+      inkedFill(shape.body, TEAL, {
+        x: shield.cells[0].x, y: shield.cells[0].y,
+        w: cols * SHIELD_CELL, h: SHIELD_CELL * 1.5
+      }, shape.outline);
     }
 
-    // Alien formation with a two-frame march.
+    // Alien formation with a two-frame march and a rank mark per row.
     const frame = Math.abs(Math.floor(animTime / 340)) % 2;
     for (const a of aliens) {
       if (!a.alive) continue;
       ctx.save();
       ctx.translate(alienX(a), alienY(a));
       const art = ALIEN_PATHS[frame];
-      inkedFill(art.body, a.color, ALIEN_GLOSS, art.outline);
+      inkedFill(art.body, a.color, ALIEN_BAND, art.outline);
+      alienRankMark(a.row);
       ctx.restore();
     }
 
@@ -1228,35 +1262,39 @@
     if (visible) {
       ctx.save();
       ctx.translate(player.x - PLAYER_W / 2, PLAYER_Y);
-      inkedFill(SHIP_PATH.body, C.ink, SHIP_GLOSS, SHIP_PATH.outline);
+      inkedFill(SHIP_PATH.body, CORAL, SHIP_BAND, SHIP_PATH.outline);
       const wings = new Path2D();
       roundRectPath(wings, 0.6, 12.5, 5, 2, 1);
       roundRectPath(wings, 21.4, 12.5, 5, 2, 1);
-      ctx.fillStyle = C.teal;
+      ctx.fillStyle = TEAL;
       ctx.fill(wings);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.stroke(wings);
       const canopy = new Path2D();
       roundRectPath(canopy, 10.5, 3.6, 6, 5.4, 2);
-      ctx.fillStyle = C.accent;
+      ctx.fillStyle = GOLD;
       ctx.fill(canopy);
-      ctx.fillStyle = "rgba(255,253,250,.85)";
-      ctx.fillRect(12, 5, 1.8, 2.6);
+      ctx.strokeStyle = INK;
+      ctx.stroke(canopy);
+      ctx.beginPath();
+      ctx.arc(13.5, 6.3, 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = CREAM;
+      ctx.fill();
       ctx.restore();
     }
 
-    // Projectiles: rounded capsules with ink outlines and a small gloss.
+    // Projectiles: rounded capsules with ink outlines and a lighter top band.
     for (const b of bullets) {
       const path = new Path2D();
       roundRectPath(path, b.x - 2, b.y - 6, 4, 12, 2);
-      const gloss = new Path2D();
-      roundRectPath(gloss, b.x - 1.2, b.y - 4.6, 1.4, 4, 0.7);
-      inkedFill(path, C.accent, gloss);
+      inkedFill(path, CORAL, { x: b.x - 2, y: b.y - 6, w: 4, h: 3 }, path, 2);
     }
     for (const b of bombs) {
       const path = new Path2D();
       roundRectPath(path, b.x - 2, b.y - 5, 4, 10, 2);
-      const gloss = new Path2D();
-      roundRectPath(gloss, b.x - 1.2, b.y - 3.6, 1.4, 3.2, 0.7);
-      inkedFill(path, C.amber, gloss);
+      inkedFill(path, GOLD, { x: b.x - 2, y: b.y - 5, w: 4, h: 2.5 }, path, 2);
     }
 
     // Particles and score popups.
@@ -1266,6 +1304,9 @@
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
@@ -1278,17 +1319,23 @@
     }
     ctx.globalAlpha = 1;
 
-    // Pause and game-over overlays.
+    // Pause and game-over overlays: solid paper, heavy ink border, coral accent.
     if (paused || gameOver) {
-      ctx.fillStyle = "rgba(247,244,238,0.9)";
+      ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = C.ink;
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(10, 10, W - 20, H - 20);
+      ctx.textAlign = "center";
+      ctx.fillStyle = INK;
       ctx.font = "700 28px monospace";
-      ctx.fillText(gameOver ? "Game over" : "Paused", W / 2, H / 2 - 8);
+      ctx.fillText(gameOver ? "Game over" : "Paused", W / 2, H / 2 - 12);
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(W / 2 - 40, H / 2 - 2, 80, 3);
       ctx.font = "14px monospace";
-      ctx.fillStyle = C.muted;
-      ctx.fillText(gameOver ? "Score " + score : "Tap Pause to resume", W / 2, H / 2 + 22);
-      if (gameOver) ctx.fillText("Tap New game to restart", W / 2, H / 2 + 46);
+      ctx.fillStyle = INK;
+      ctx.fillText(gameOver ? "Score " + score : "Tap Pause to resume", W / 2, H / 2 + 24);
+      if (gameOver) ctx.fillText("Tap New game to restart", W / 2, H / 2 + 48);
     }
   }
 

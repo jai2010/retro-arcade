@@ -164,7 +164,10 @@
   const N = 4, W = 400, H = 460;
   const TILE = 88, OX = 24, OY = 46;
   const KEY = "fifteen.best.v1";
-  const INK = "#20262b";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const scoreEl = document.getElementById("score");
@@ -269,25 +272,29 @@
     ctx.closePath();
   }
 
-  // Palette fill, ink outline, soft shadow and a top gloss — shared by every tile.
+  // Flat palette fill, thick ink outline and a two-tone top band — shared by every tile.
   function paintTile(x, y, value) {
-    const coloured = value % 5 === 0 ? "#3f9b91" : value % 5 === 1 ? "#e5724c" : "#fffdfa";
+    const colour = value % 4 === 0 ? CORAL : value % 4 === 1 ? TEAL : value % 4 === 2 ? GOLD : CREAM;
     roundRect(x + 3, y + 3, TILE - 6, TILE - 6, 9);
-    ctx.shadowColor = "rgba(32,38,43,0.18)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
-    ctx.fillStyle = coloured;
+    ctx.fillStyle = colour;
     ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[colour] || CREAM;
+    ctx.fillRect(x + 3, y + 3, TILE - 6, (TILE - 6) * 0.24);
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    ctx.fillStyle = coloured === "#fffdfa" ? "rgba(32,38,43,0.07)" : "rgba(255,253,250,0.35)";
-    roundRect(x + 9, y + 6, TILE - 18, 3, 1.5);
-    ctx.fill();
-    ctx.fillStyle = coloured === "#fffdfa" ? INK : "#fffdfa";
+    // Inked notches in the band make tiles read by pattern as well as colour.
+    ctx.fillStyle = colour === CREAM || colour === GOLD ? INK : CREAM;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.arc(x + 16 + i * 8, y + 13, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = colour === CORAL || colour === TEAL ? CREAM : INK;
     ctx.font = "700 34px ui-monospace, monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -295,24 +302,36 @@
   }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#f7f4ee";
+    ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
 
+    ctx.strokeStyle = "rgba(32,38,43,0.10)";
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i <= N; i++) {
+      ctx.beginPath(); ctx.moveTo(OX + i * TILE + .5, OY); ctx.lineTo(OX + i * TILE + .5, OY + N * TILE); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(OX, OY + i * TILE + .5); ctx.lineTo(OX + N * TILE, OY + i * TILE + .5); ctx.stroke();
+    }
+
     roundRect(OX - 7, OY - 7, N * TILE + 14, N * TILE + 14, 12);
-    ctx.fillStyle = "#ede7dc";
+    ctx.fillStyle = GOLD;
     ctx.fill();
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[GOLD];
+    ctx.fillRect(OX - 7, OY - 7, N * TILE + 14, (N * TILE + 14) * 0.24);
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
 
     const bx = (blank % N) * TILE, by = Math.floor(blank / N) * TILE;
     roundRect(bx + 4, by + 4, TILE - 8, TILE - 8, 9);
-    ctx.fillStyle = "rgba(32,38,43,0.07)";
+    ctx.fillStyle = PAPER;
     ctx.fill();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = "rgba(63,155,145,0.65)";
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = TEAL;
+    ctx.lineWidth = 3;
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -328,29 +347,35 @@
       paintTile(x, y, tiles[i]);
     }
 
-    ctx.fillStyle = "rgba(32,38,43,0.45)";
+    ctx.fillStyle = INK;
     ctx.font = "11px ui-monospace, monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     ctx.fillText("SLIDE · SOLVE · REPEAT", W / 2, 440);
 
     if (paused || won || !started) {
-      ctx.fillStyle = "rgba(247,244,238,0.89)";
+      ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(10, 10, W - 20, H - 20);
       ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
       ctx.fillStyle = INK;
       ctx.font = "700 24px ui-monospace, monospace";
       ctx.fillText(won ? "Solved!" : paused ? "Paused" : "Ready?", W / 2, H / 2 - 12);
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(W / 2 - 34, H / 2 - 2, 68, 3);
       ctx.font = "12px ui-monospace, monospace";
-      ctx.fillStyle = "rgba(32,38,43,0.62)";
+      ctx.fillStyle = INK;
       const hint = won ? (isPhone() ? "Tap New game to shuffle again" : "Press R to shuffle again")
         : paused ? (isPhone() ? "Tap Pause to resume" : "Press P to resume")
         : (isPhone() ? "Tap a tile to begin" : "Use arrow keys to begin");
-      ctx.fillText(hint, W / 2, H / 2 + 18);
+      ctx.fillText(hint, W / 2, H / 2 + 22);
       if (won) {
-        ctx.fillStyle = "#e5724c";
+        ctx.fillStyle = CORAL;
         ctx.font = "700 13px ui-monospace, monospace";
-        ctx.fillText(moves + " moves · " + fmtTime(elapsed), W / 2, H / 2 + 42);
+        ctx.fillText(moves + " moves · " + fmtTime(elapsed), W / 2, H / 2 + 46);
       }
     }
   }

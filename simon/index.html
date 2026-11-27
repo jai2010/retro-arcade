@@ -510,7 +510,13 @@
   }
 
   const KEY = "simon.best.v1";
-  const COLORS = ["#e5724c", "#3f9b91", "#e6b34d", "#4d7bb0"];
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const CORAL_LT = "#f0a17f", TEAL_LT = "#75bdb2", GOLD_LT = "#f2cf7a";
+  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT };
+  const COLORS = [CORAL, TEAL, GOLD, CREAM];
+  const MARKS = ["dots", "bar", "none", "notch"];
   const LABELS = ["1", "2", "3", "4"];
 
   const canvas = document.getElementById("game");
@@ -589,86 +595,107 @@
     path.closePath();
   }
 
-  // Soft shadow during fill, a heavy ink outline and a small glossy cap.
-  function inkedShape(path, color, gloss, lineWidth) {
+  // Flat palette fill, thick ink outline and a lighter top band — the same
+  // construction used by the arcade thumbnail illustrations.
+  function paintShape(path, color, band, lineWidth) {
     ctx.save();
     ctx.fillStyle = color;
-    ctx.shadowColor = "rgba(32,38,43,.18)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
     ctx.fill(path);
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.strokeStyle = "#20262b";
-    ctx.lineWidth = lineWidth || 2;
+    ctx.save();
+    ctx.clip(path);
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(band.x, band.y, band.w, band.h);
+    ctx.restore();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = lineWidth || 3;
     ctx.lineJoin = "round";
     ctx.stroke(path);
-    if (gloss) {
-      ctx.fillStyle = "rgba(255,253,250,.8)";
-      ctx.fill(gloss);
-    }
     ctx.restore();
   }
 
+  function lightInk(color, lit) {
+    return color === GOLD || color === CREAM || lit ? INK : CREAM;
+  }
+
   function draw() {
-    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, size, size);
     rects.forEach((r, i) => {
       const radius = Math.min(28, r.w * 0.14);
       const path = new Path2D();
       roundRectPath(path, r.x, r.y, r.w, r.h, radius);
-      const gloss = new Path2D();
-      roundRectPath(gloss,
-        r.x + r.w * 0.12, r.y + r.h * 0.08,
-        Math.min(40, r.w * 0.16), Math.max(3, r.h * 0.03),
-        Math.max(1.5, r.h * 0.015));
-      inkedShape(path, COLORS[i], gloss, 2);
+      const color = COLORS[i];
+      paintShape(path, color, { x: r.x, y: r.y, w: r.w, h: r.h * 0.24 }, 3);
+
+      // Simple pattern mark so each pad reads differently, not just by hue.
+      const markColor = lightInk(color, false);
+      const mx = r.x + r.w * 0.16, my = r.y + r.h * 0.18;
+      ctx.save();
+      ctx.fillStyle = markColor;
+      ctx.strokeStyle = markColor;
+      ctx.lineWidth = 2;
+      if (MARKS[i] === "dots") {
+        for (const dx of [-4, 4]) { ctx.beginPath(); ctx.arc(mx + dx, my, 2.4, 0, Math.PI * 2); ctx.fill(); }
+      } else if (MARKS[i] === "bar") {
+        ctx.beginPath(); ctx.moveTo(mx - 7, my); ctx.lineTo(mx + 7, my); ctx.stroke();
+      } else if (MARKS[i] === "notch") {
+        ctx.beginPath();
+        ctx.moveTo(mx - 6, my - 3); ctx.lineTo(mx + 6, my - 3); ctx.lineTo(mx, my + 5);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+
       if (flash[i] > 0) {
         ctx.save();
-        ctx.globalAlpha = Math.min(1, flash[i] / 120);
-        ctx.fillStyle = "#fffdfa";
+        ctx.fillStyle = TINTS[color] || CREAM;
         ctx.fill(path);
         ctx.restore();
       }
-      ctx.fillStyle = flash[i] > 0 ? COLORS[i] : (i === 2 ? "#20262b" : "#fffdfa");
+      ctx.fillStyle = lightInk(color, flash[i] > 0);
       ctx.font = "800 " + Math.round(Math.max(20, r.w * 0.34)) + "px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(LABELS[i], r.x + r.w / 2, r.y + r.h / 2);
     });
 
-    // Chunky dark centre button with a small glossy highlight.
+    // Chunky ink centre button with a small coral dot.
     const mid = size / 2;
     const cr = Math.min(22, Math.max(11, size * 0.055));
     const button = new Path2D();
     button.arc(mid, mid, cr, 0, Math.PI * 2);
-    inkedShape(button, "#20262b", null, 2);
+    paintShape(button, INK, { x: mid - cr, y: mid - cr, w: cr * 2, h: cr }, 3);
     const cap = new Path2D();
     cap.arc(mid - cr * 0.28, mid - cr * 0.3, Math.max(1.5, cr * 0.26), 0, Math.PI * 2);
     ctx.save();
-    ctx.fillStyle = "rgba(255,253,250,.8)";
+    ctx.fillStyle = CORAL_LT;
     ctx.fill(cap);
     ctx.restore();
 
     if (errorTime > 0) {
-      ctx.fillStyle = "rgba(229,114,76," + (0.16 + 0.2 * (errorTime / 500)) + ")";
-      ctx.fillRect(0, 0, size, size);
+      ctx.strokeStyle = CORAL;
+      ctx.lineWidth = 6;
+      ctx.strokeRect(3, 3, size - 6, size - 6);
     }
 
     if (paused || phase === "idle" || phase === "over") {
-      ctx.fillStyle = "rgba(247,244,238,0.88)";
+      ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, size, size);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(10, 10, size - 20, size - 20);
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
       let title, hint;
       if (paused) { title = "Paused"; hint = "Tap Pause to resume"; }
       else if (phase === "over") { title = "Game over"; hint = "Score " + score + (phoneMode.matches ? " — tap a pad" : " — press R or tap a pad"); }
       else { title = "Simon"; hint = phoneMode.matches ? "Tap a pad to begin" : "Tap a pad or press 1-4 to begin"; }
-      ctx.fillStyle = "#20262b";
+      ctx.fillStyle = INK;
       ctx.font = "700 22px monospace";
       ctx.fillText(title, size / 2, size / 2 - 6);
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(size / 2 - 34, size / 2 + 4, 68, 3);
       ctx.font = "13px monospace";
-      ctx.fillStyle = "rgba(32,38,43,.62)";
+      ctx.fillStyle = INK;
       ctx.fillText(hint, size / 2, size / 2 + 20);
     }
   }

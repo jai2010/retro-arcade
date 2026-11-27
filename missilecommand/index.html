@@ -149,8 +149,10 @@
   const BASES = [52, 171, 290];
   const AMMO = 10;
   const KEY = "missilecommand.best.v1";
-  const INK = "#20262b";
-  const SHADOW = "rgba(32,38,43,0.18)";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const scoreEl = document.getElementById("score");
@@ -363,17 +365,32 @@
   function drawCity(c) {
     const y = GROUND;
     if (!c.alive) {
-      ctx.fillStyle = "rgba(32,38,43,0.32)"; ctx.fillRect(c.x - 13, y - 3, 26, 3);
-      ctx.fillRect(c.x - 8, y - 7, 9, 4); ctx.fillRect(c.x + 2, y - 5, 7, 2);
+      // Rubble with a coral X, so a lost city reads by pattern, not colour alone.
+      const rx = c.x - 13;
+      ctx.fillStyle = TINTS[GOLD];
+      ctx.fillRect(rx, y - 5, 26, 5);
+      ctx.lineWidth = 2; ctx.strokeStyle = INK;
+      ctx.strokeRect(rx, y - 5, 26, 5);
+      ctx.strokeStyle = CORAL; ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(rx + 3, y - 4); ctx.lineTo(rx + 23, y - 1);
+      ctx.moveTo(rx + 23, y - 4); ctx.lineTo(rx + 3, y - 1);
+      ctx.stroke();
       return;
     }
+    // Teal blocks with a lighter top band and gold window marks.
     const blocks = [[-13, 12, 8], [-4, 20, 7], [4, 15, 9]];
     for (const [dx, h, w] of blocks) {
-      ctx.fillStyle = "#fffdfa"; ctx.fillRect(c.x + dx, y - h, w, h);
+      const bx = c.x + dx;
+      ctx.fillStyle = TEAL;
+      ctx.fillRect(bx, y - h, w, h);
+      ctx.fillStyle = TINTS[TEAL];
+      ctx.fillRect(bx, y - h, w, 3);
       ctx.lineWidth = 2; ctx.strokeStyle = INK;
-      ctx.strokeRect(c.x + dx, y - h, w, h); ctx.fillStyle = "#e6b34d";
-      for (let wy = y - h + 4; wy < y - 3; wy += 7) {
-        ctx.fillRect(c.x + dx + 2, wy, 2, 2); ctx.fillRect(c.x + dx + w - 4, wy, 2, 2);
+      ctx.strokeRect(bx, y - h, w, h);
+      ctx.fillStyle = GOLD;
+      for (let wy = y - h + 6; wy < y - 3; wy += 7) {
+        ctx.fillRect(bx + 2, wy, 2, 2); ctx.fillRect(bx + w - 4, wy, 2, 2);
       }
     }
   }
@@ -381,10 +398,13 @@
     const y = H - 12;
     ctx.beginPath(); ctx.moveTo(b.x, y - 14);
     ctx.lineTo(b.x + 13, y + 3); ctx.lineTo(b.x - 13, y + 3);
-    ctx.closePath(); ctx.fillStyle = "#3f9b91";
-    ctx.fill(); ctx.lineWidth = 2;
+    ctx.closePath(); ctx.fillStyle = TEAL;
+    ctx.fill(); ctx.lineWidth = 3; ctx.lineJoin = "round";
     ctx.strokeStyle = INK; ctx.stroke();
-    ctx.fillStyle = INK;
+    // Lighter inset band along the top edge of the silo.
+    ctx.beginPath(); ctx.moveTo(b.x - 6, y - 6); ctx.lineTo(b.x + 6, y - 6);
+    ctx.lineWidth = 3; ctx.strokeStyle = TINTS[TEAL]; ctx.stroke();
+    ctx.fillStyle = GOLD;
     for (let i = 0; i < b.ammo; i++) {
       ctx.fillRect(b.x - 11 + i * 2.3, y - 4, 1.6, 5);
     }
@@ -393,118 +413,125 @@
     if (!m.trail.length) return;
     ctx.beginPath(); ctx.moveTo(m.trail[0].x, m.trail[0].y);
     for (const p of m.trail) ctx.lineTo(p.x, p.y);
-    ctx.lineTo(m.x, m.y); ctx.lineWidth = 2;
+    ctx.lineTo(m.x, m.y); ctx.lineWidth = 3;
     ctx.strokeStyle = color; ctx.lineCap = "round";
+    ctx.setLineDash([1, 6]);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
   function drawBlast(b) {
-    const fade = 1 - Math.max(0, (b.age - 0.18) / Math.max(0.01, b.ttl - 0.18));
-    ctx.globalAlpha = Math.max(0, Math.min(1, fade)); ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fillStyle = "#e5724c";
-    ctx.fill(); ctx.lineWidth = 2;
-    ctx.strokeStyle = INK; ctx.stroke();
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.55, 0, Math.PI * 2);
-    ctx.fillStyle = "#e6b34d"; ctx.fill();
-    ctx.strokeStyle = "rgba(32,38,43,0.35)"; ctx.lineWidth = 1;
-    for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4 + b.x * 0.01;
-      ctx.beginPath(); ctx.moveTo(b.x + Math.cos(a) * b.r * 0.75, b.y + Math.sin(a) * b.r * 0.75);
-      ctx.lineTo(b.x + Math.cos(a) * b.r * 1.25, b.y + Math.sin(a) * b.r * 1.25); ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
+    // An eight-point gold starburst with a lighter inset star, like the thumbnail.
+    const star = (r, inner) => {
+      ctx.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const a = i * Math.PI / 8 + b.x * 0.01;
+        const rad = i % 2 ? inner : r;
+        const px = b.x + Math.cos(a) * rad, py = b.y + Math.sin(a) * rad;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    };
+    star(b.r, b.r * 0.45);
+    ctx.fillStyle = GOLD; ctx.fill();
+    ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = INK; ctx.stroke();
+    star(b.r * 0.58, b.r * 0.26);
+    ctx.fillStyle = TINTS[GOLD]; ctx.fill();
   }
   function drawReticle() {
     if (!showReticle || paused || gameOver) return;
     const x = reticle.x, y = reticle.y;
-    ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    ctx.strokeStyle = INK; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2);
     ctx.moveTo(x - 16, y); ctx.lineTo(x - 11, y); ctx.moveTo(x + 11, y); ctx.lineTo(x + 16, y);
     ctx.moveTo(x, y - 16); ctx.lineTo(x, y - 11); ctx.moveTo(x, y + 11); ctx.lineTo(x, y + 16);
     ctx.stroke(); ctx.beginPath();
-    ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fillStyle = "#e5724c";
-    ctx.fill();
+    ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fillStyle = CORAL;
+    ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
   }
   function draw() {
-    ctx.clearRect(0, 0, W, H);
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#fffdfa");
-    sky.addColorStop(1, "#efe7db");
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-    // Sparse stars and a low glow make the dusk sky read as a vector scene.
-    ctx.fillStyle = "rgba(32,38,43,0.22)";
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    // Sparse ink stars over flat paper — no sky gradient or dusk glow.
+    ctx.fillStyle = INK;
     for (let i = 0; i < 28; i++) {
       const sx = (i * 83 + 27) % W, sy = (i * 47 + 13) % 250;
       ctx.fillRect(sx, sy, i % 6 === 0 ? 2 : 1, i % 6 === 0 ? 2 : 1);
     }
-    ctx.beginPath(); ctx.ellipse(W / 2, GROUND - 2, W * 0.55, 28, 0, Math.PI, Math.PI * 2);
-    ctx.fillStyle = "rgba(229,114,76,0.10)"; ctx.fill();
-    // Ground and its moving-looking hatch marks.
-    ctx.fillStyle = "#ede7dc"; ctx.fillRect(0, GROUND, W, H - GROUND);
-    ctx.strokeStyle = INK; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, GROUND + 1); ctx.lineTo(W, GROUND + 1); ctx.stroke();
-    ctx.strokeStyle = "rgba(32,38,43,0.22)"; ctx.lineWidth = 1;
+    // Ink ground strip with a teal top band and gold hatch marks.
+    ctx.fillStyle = INK; ctx.fillRect(0, GROUND, W, H - GROUND);
+    ctx.fillStyle = TINTS[TEAL]; ctx.fillRect(0, GROUND, W, 4);
+    ctx.strokeStyle = INK; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(W, GROUND); ctx.stroke();
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
     for (let x = 8; x < W; x += 22) {
-      ctx.beginPath(); ctx.moveTo(x, GROUND + 8); ctx.lineTo(x + 10, GROUND + 8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, GROUND + 9); ctx.lineTo(x + 10, GROUND + 9); ctx.stroke();
     }
     cities.forEach(drawCity);
     bases.forEach(drawBase);
     incoming.forEach(m => {
-      drawTrail(m, "rgba(229,114,76,0.75)");
+      drawTrail(m, CORAL);
       ctx.beginPath(); ctx.moveTo(m.x, m.y - 5);
       ctx.lineTo(m.x + 4, m.y + 5); ctx.lineTo(m.x - 4, m.y + 5);
-      ctx.closePath(); ctx.fillStyle = "#e5724c";
-      ctx.fill(); ctx.lineWidth = 1.5;
+      ctx.closePath(); ctx.fillStyle = CORAL;
+      ctx.fill(); ctx.lineWidth = 3; ctx.lineJoin = "round";
       ctx.strokeStyle = INK; ctx.stroke();
     });
     outgoing.forEach(m => {
-      drawTrail(m, "rgba(63,155,145,0.85)");
+      drawTrail(m, TEAL);
       ctx.beginPath();
-      ctx.arc(m.x, m.y, 2.6, 0, Math.PI * 2);
-      ctx.fillStyle = "#3f9b91";
-      ctx.fill();
+      ctx.arc(m.x, m.y, 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = TEAL;
+      ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
     });
     blasts.forEach(drawBlast);
     for (const p of pops) {
-      ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6));
-      ctx.fillStyle = p.color;
       ctx.font = "800 12px monospace";
       ctx.textAlign = "center";
+      ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = INK;
+      ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillStyle = p.color;
       ctx.fillText(p.text, p.x, p.y);
     }
-    ctx.globalAlpha = 1;
     drawReticle();
     // Small in-context cue while the player is still learning the gesture.
     if (!started && !paused) {
-      ctx.fillStyle = "rgba(255,253,250,0.85)";
+      ctx.fillStyle = PAPER;
       ctx.fillRect(28, H / 2 - 30, W - 56, 60);
       ctx.strokeStyle = INK;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 4;
       ctx.strokeRect(28, H / 2 - 30, W - 56, 60);
       ctx.fillStyle = INK;
       ctx.font = "700 13px monospace";
       ctx.textAlign = "center";
       ctx.fillText("DEFEND THE CITIES", W / 2, H / 2 - 8);
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(W / 2 - 52, H / 2, 104, 3);
       ctx.font = "11px monospace";
-      ctx.fillStyle = "rgba(32,38,43,0.62)";
-      ctx.fillText(touchPhone() ? "Tap the sky to intercept" : "Click or press Space to fire", W / 2, H / 2 + 15);
+      ctx.fillStyle = INK;
+      ctx.fillText(touchPhone() ? "Tap the sky to intercept" : "Click or press Space to fire", W / 2, H / 2 + 17);
     }
     if (paused || gameOver) {
-      ctx.fillStyle = "rgba(255,253,250,0.88)";
+      ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(10, 10, W - 20, H - 20);
       ctx.fillStyle = INK;
       ctx.font = "700 25px monospace";
       ctx.textAlign = "center";
       ctx.fillText(gameOver ? "Game over" : "Paused", W / 2, H / 2 - 16);
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(W / 2 - 40, H / 2 - 6, 80, 3);
       ctx.font = "12px monospace";
-      ctx.fillStyle = "rgba(32,38,43,0.62)";
+      ctx.fillStyle = INK;
       const hint = gameOver
         ? (touchPhone() ? "Tap the board to play again" : "Press R to play again")
         : (touchPhone() ? "Tap Pause to resume" : "Press P to resume");
-      ctx.fillText(hint, W / 2, H / 2 + 12);
+      ctx.fillText(hint, W / 2, H / 2 + 14);
       if (gameOver) {
-        ctx.fillStyle = "#e5724c";
+        ctx.fillStyle = CORAL;
         ctx.font = "700 14px monospace";
-        ctx.fillText("Score " + score, W / 2, H / 2 + 38);
+        ctx.fillText("Score " + score, W / 2, H / 2 + 40);
       }
     }
   }

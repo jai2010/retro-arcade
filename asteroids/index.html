@@ -671,19 +671,25 @@
   const RADII = { 1: 16, 2: 30, 3: 52 };
   const POINTS = { 1: 100, 2: 50, 3: 20 };
   const BEST_KEY = "asteroids.best.v1";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
   const C = {
-    ink: "#20262b",
-    muted: "rgba(32,38,43,.62)",
-    accent: "#e5724c",
-    accentDark: "#20262b",
-    teal: "#3f9b91",
-    amber: "#e6b34d",
-    blue: "#4d7bb0",
-    sand: "#ede7dc",
-    line: "#ede7dc",
-    surface: "#fffdfa",
-    paper: "#f7f4ee"
+    ink: INK,
+    muted: INK,
+    accent: CORAL,
+    accentDark: INK,
+    teal: TEAL,
+    amber: GOLD,
+    blue: TEAL,
+    sand: PAPER,
+    line: INK,
+    surface: CREAM,
+    paper: PAPER
   };
+  // Rock classes get both a palette colour and a dot count, never colour alone.
+  const ROCK_COLORS = { 1: CORAL, 2: GOLD, 3: TEAL };
 
   const canvas = document.getElementById("board");
   const ctx = canvas.getContext("2d");
@@ -1042,25 +1048,24 @@
     path.closePath();
   }
 
-  // Soft shadow while filling, then a heavier ink outline and a small gloss.
-  function inkedShape(path, color, gloss, lineWidth) {
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
+  function inkedShape(path, color, band, lineWidth) {
     ctx.save();
     ctx.fillStyle = color;
-    ctx.shadowColor = "rgba(32,38,43,.18)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
     ctx.fill(path);
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.strokeStyle = C.ink;
+    if (band) {
+      ctx.save();
+      ctx.clip(path);
+      ctx.fillStyle = TINTS[color] || CREAM;
+      ctx.fillRect(band.x, band.y, band.w, band.h);
+      ctx.restore();
+    }
+    ctx.strokeStyle = INK;
     ctx.lineWidth = lineWidth || 3;
     ctx.lineJoin = "round";
+    ctx.lineCap = "round";
     ctx.stroke(path);
-    if (gloss) {
-      ctx.fillStyle = "rgba(255,253,250,.85)";
-      ctx.fill(gloss);
-    }
     ctx.restore();
   }
 
@@ -1097,10 +1102,20 @@
   }
 
   function draw() {
-    ctx.clearRect(0, 0, WORLD, WORLD);
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, WORLD, WORLD);
 
+    // Faint ink grid and stars on solid paper.
+    ctx.strokeStyle = "rgba(32,38,43,0.10)";
+    ctx.lineWidth = 1.5;
+    for (let x = 60; x < WORLD; x += 60) {
+      ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, WORLD); ctx.stroke();
+    }
+    for (let y = 60; y < WORLD; y += 60) {
+      ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(WORLD, y + 0.5); ctx.stroke();
+    }
     for (const s of stars) {
-      ctx.fillStyle = "rgba(32,38,43," + s.a + ")";
+      ctx.fillStyle = "rgba(32,38,43,0.10)";
       ctx.fillRect(s.x, s.y, s.r, s.r);
     }
 
@@ -1109,9 +1124,18 @@
         ctx.save();
         ctx.translate(px, py);
         ctx.rotate(a.angle);
-        const gloss = new Path2D();
-        roundRectPath(gloss, -a.r * 0.45, -a.r * 0.5, a.r * 0.55, a.r * 0.16, a.r * 0.08);
-        inkedShape(softRockPath(a.verts, a.r), C.sand, gloss, 3);
+        const color = ROCK_COLORS[a.size];
+        inkedShape(softRockPath(a.verts, a.r), color, {
+          x: -a.r * 1.2, y: -a.r * 1.2, w: a.r * 2.4, h: a.r * 0.55
+        }, 3);
+        // One, two or three ink notches make the rock class legible.
+        ctx.fillStyle = INK;
+        for (let i = 0; i < a.size; i++) {
+          ctx.beginPath();
+          ctx.arc((i - (a.size - 1) / 2) * a.r * 0.42, a.r * 0.12,
+            Math.max(1.2, a.r * 0.06), 0, TAU);
+          ctx.fill();
+        }
         ctx.restore();
       });
     }
@@ -1120,9 +1144,7 @@
       drawAtEdges(b.x, b.y, 4, (px, py) => {
         const path = new Path2D();
         path.arc(px, py, 2.6, 0, TAU);
-        const gloss = new Path2D();
-        gloss.arc(px - 0.8, py - 0.8, 0.9, 0, TAU);
-        inkedShape(path, C.accent, gloss, 2);
+        inkedShape(path, CORAL, { x: px - 2.6, y: py - 2.6, w: 5.2, h: 1.4 }, 2);
       });
     }
 
@@ -1147,61 +1169,60 @@
           ctx.save();
           ctx.translate(px, py);
           ctx.rotate(ship.angle);
-          // Small amber flame, a little longer while thrusting.
+          // Small gold flame, a little longer while thrusting.
           const flame = new Path2D();
           flame.moveTo(-SHIP_R * 0.95, -SHIP_R * 0.42);
           flame.lineTo(-SHIP_R * (thrusting ? 1.95 : 1.5), 0);
           flame.lineTo(-SHIP_R * 0.95, SHIP_R * 0.42);
           flame.closePath();
-          inkedShape(flame, C.amber, null, 2);
+          inkedShape(flame, GOLD, {
+            x: -SHIP_R * 1.1, y: -SHIP_R * 0.45, w: SHIP_R * 2.2, h: SHIP_R * 0.3
+          }, 2);
           const hull = new Path2D();
           hull.moveTo(SHIP_R * 1.35, 0);
           hull.lineTo(-SHIP_R, -SHIP_R * 0.9);
           hull.lineTo(-SHIP_R, SHIP_R * 0.9);
           hull.closePath();
-          const gloss = new Path2D();
-          roundRectPath(gloss, -SHIP_R * 0.1, -SHIP_R * 0.5, SHIP_R * 0.85, SHIP_R * 0.16, SHIP_R * 0.08);
-          inkedShape(hull, C.accent, gloss, 3);
+          inkedShape(hull, CORAL, {
+            x: -SHIP_R * 1.1, y: -SHIP_R * 0.95, w: SHIP_R * 2.5, h: SHIP_R * 0.45
+          }, 3);
           const canopy = new Path2D();
           roundRectPath(canopy, -SHIP_R * 0.1, -SHIP_R * 0.25, SHIP_R * 0.8, SHIP_R * 0.5, SHIP_R * 0.2);
-          ctx.fillStyle = C.teal;
+          ctx.fillStyle = TEAL;
           ctx.fill(canopy);
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = 2;
+          ctx.stroke(canopy);
           ctx.restore();
         });
         ctx.globalAlpha = 1;
       }
     }
 
-    if (!paused && !gameOver && performance.now() < hintUntil) {
-      ctx.fillStyle = "rgba(255,253,250,0.82)";
-      roundRectPath(ctx, 12, WORLD - 62, WORLD - 24, 50, 10);
-      ctx.fill();
-      ctx.fillStyle = "#626a6f";
-      ctx.font = "700 15px monospace";
-      ctx.textAlign = "center";
-      ctx.fillText("SWIPE SIDEWAYS: TURN", WORLD / 2, WORLD - 40);
-      ctx.fillText("SWIPE UP: THRUST   ·   TAP: FIRE", WORLD / 2, WORLD - 18);
-    }
-
     if (bannerTimer > 0 && !gameOver) {
-      ctx.globalAlpha = clamp(bannerTimer / 0.5, 0, 1);
-      ctx.fillStyle = C.accent;
+      ctx.fillStyle = INK;
       ctx.font = "800 40px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(bannerText, WORLD / 2, 118);
-      ctx.globalAlpha = 1;
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(WORLD / 2 - 60, 148, 120, 4);
     }
 
     if (paused || gameOver) {
-      ctx.fillStyle = "rgba(247,244,238,0.88)";
+      ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, WORLD, WORLD);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(20, 20, WORLD - 40, WORLD - 40);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = C.ink;
+      ctx.fillStyle = INK;
       ctx.font = "800 54px monospace";
       ctx.fillText(gameOver ? "Game over" : "Paused", WORLD / 2, WORLD / 2 - 34);
-      ctx.fillStyle = C.muted;
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(WORLD / 2 - 50, WORLD / 2 - 4, 100, 4);
+      ctx.fillStyle = INK;
       ctx.font = "22px monospace";
       if (gameOver) {
         ctx.fillText("Final score " + score, WORLD / 2, WORLD / 2 + 28);

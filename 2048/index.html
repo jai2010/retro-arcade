@@ -508,21 +508,26 @@
   const hudBest = document.getElementById("hudBest");
   const announceEl = document.getElementById("announce");
 
-  const INK = "#20262b";
-  const SHADOW = "rgba(32,38,43,0.18)";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const CORAL_LT = "#f0a17f", TEAL_LT = "#75bdb2", GOLD_LT = "#f2cf7a";
+  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT };
 
+  // Tile tiers carry palette colour plus a small ink mark, so value groups read
+  // at a glance while the printed number still gives the exact value.
   const TILES = {
-    2:    ["#ede7dc", "#20262b"],
-    4:    ["#e6b34d", "#20262b"],
-    8:    ["#e5724c", "#fffdfa"],
-    16:   ["#e5724c", "#fffdfa"],
-    32:   ["#3f9b91", "#fffdfa"],
-    64:   ["#3f9b91", "#fffdfa"],
-    128:  ["#4d7bb0", "#fffdfa"],
-    256:  ["#4d7bb0", "#fffdfa"],
-    512:  ["#20262b", "#fffdfa"],
-    1024: ["#20262b", "#fffdfa"],
-    2048: ["#20262b", "#fffdfa"]
+    2:    { fill: CREAM,    text: INK,   mark: "dot" },
+    4:    { fill: GOLD_LT,  text: INK,   mark: "dot" },
+    8:    { fill: GOLD,     text: CREAM, mark: "bar" },
+    16:   { fill: GOLD,     text: CREAM, mark: "bar" },
+    32:   { fill: TEAL_LT,  text: INK,   mark: "bar" },
+    64:   { fill: TEAL,     text: CREAM, mark: "dot" },
+    128:  { fill: TEAL,     text: CREAM, mark: "dot" },
+    256:  { fill: CORAL_LT, text: INK,   mark: "bar" },
+    512:  { fill: CORAL,    text: CREAM, mark: "dot" },
+    1024: { fill: CORAL,    text: CREAM, mark: "dot" },
+    2048: { fill: INK,      text: GOLD,  mark: "diamond" }
   };
 
   let W = 400, H = 400;
@@ -681,31 +686,45 @@
     ctx.closePath();
   }
 
+  // Flat palette fill, thick ink outline and a lighter top band — the same
+  // construction used by the arcade thumbnail illustrations.
   function drawTile(value, x, y, size) {
     const inset = size * 0.06;
     const style = TILES[value] || TILES[2048];
     const tx = x + inset, ty = y + inset;
     const tw = size - inset * 2, th = size - inset * 2;
     roundRect(tx, ty, tw, th, size * 0.12);
-    ctx.shadowColor = SHADOW;
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
-    ctx.fillStyle = style[0];
+    ctx.fillStyle = style.fill;
     ctx.fill();
-    ctx.shadowColor = "rgba(32,38,43,0)";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[style.fill] || CREAM;
+    ctx.fillRect(tx, ty, tw, Math.max(3, th * 0.24));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    // Shallow gloss near the top, well clear of the number.
-    ctx.fillStyle = "rgba(255,253,250,0.4)";
-    roundRect(tx + tw * 0.14, ty + th * 0.09, tw * 0.72, Math.max(3, th * 0.09), th * 0.045);
-    ctx.fill();
+
+    // Small corner marks reinforce the tier without crowding the number.
+    const mx = tx + tw * 0.18, my = ty + th * 0.8;
+    ctx.fillStyle = style.text;
+    ctx.strokeStyle = style.text;
+    ctx.lineWidth = 2;
+    if (style.mark === "dot") {
+      ctx.beginPath(); ctx.arc(mx, my, Math.max(2, size * 0.045), 0, Math.PI * 2); ctx.fill();
+    } else if (style.mark === "bar") {
+      ctx.beginPath(); ctx.moveTo(mx - size * 0.07, my); ctx.lineTo(mx + size * 0.07, my); ctx.stroke();
+    } else if (style.mark === "diamond") {
+      const d = Math.max(3, size * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(mx, my - d); ctx.lineTo(mx + d, my); ctx.lineTo(mx, my + d); ctx.lineTo(mx - d, my);
+      ctx.closePath(); ctx.fill();
+    }
 
     const digits = String(value).length;
     const fontSize = size * (digits <= 3 ? 0.42 : digits === 4 ? 0.32 : 0.25);
-    ctx.fillStyle = style[1];
+    ctx.fillStyle = style.text;
     ctx.font = "700 " + fontSize + "px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -713,18 +732,23 @@
   }
 
   function drawOverlay() {
-    ctx.fillStyle = "rgba(255,253,250,0.92)";
+    ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(8, 8, W - 16, H - 16);
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     const won = state === "won";
-    ctx.fillStyle = "#20262b";
+    ctx.fillStyle = INK;
     ctx.font = "700 " + Math.max(18, Math.min(26, W * 0.06)) + "px monospace";
     ctx.fillText(won ? "You reached 2048!" : "Game over", W / 2, H / 2 - 42);
+    ctx.fillStyle = CORAL;
+    ctx.fillRect(W / 2 - 34, H / 2 - 30, 68, 3);
 
-    ctx.fillStyle = "rgba(32,38,43,0.62)";
+    ctx.fillStyle = INK;
     ctx.font = Math.max(12, Math.min(14, W * 0.034)) + "px monospace";
     ctx.fillText(won ? "Keep going for a higher score." : "Score " + score + " — no moves left.", W / 2, H / 2 - 14);
 
@@ -734,25 +758,22 @@
     overlayAction = won ? "continue" : "restart";
 
     roundRect(overlayBtn.x, overlayBtn.y, bw, bh, 8);
-    ctx.shadowColor = SHADOW;
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
-    ctx.fillStyle = "#e5724c";
+    ctx.fillStyle = CORAL;
     ctx.fill();
-    ctx.shadowColor = "rgba(32,38,43,0)";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = CORAL_LT;
+    ctx.fillRect(overlayBtn.x, overlayBtn.y, bw, Math.max(3, bh * 0.24));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    ctx.fillStyle = "rgba(255,253,250,0.4)";
-    roundRect(overlayBtn.x + 8, overlayBtn.y + 5, bw - 16, 4, 2);
-    ctx.fill();
-    ctx.fillStyle = "#fffdfa";
+    ctx.fillStyle = CREAM;
     ctx.font = "600 13px monospace";
     ctx.fillText(won ? "Keep playing" : "New game", W / 2, overlayBtn.y + bh / 2);
 
-    ctx.fillStyle = "rgba(32,38,43,0.62)";
+    ctx.fillStyle = INK;
     ctx.font = "12px monospace";
     ctx.fillText(won ? "Tap to continue" : "Tap New game", W / 2, overlayBtn.y + bh + 22);
   }
@@ -761,15 +782,16 @@
     if (!board) return;
     const cw = W / GRID;
     const ch = H / GRID;
-    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
 
     for (let r = 0; r < GRID; r++) {
       for (let c = 0; c < GRID; c++) {
         roundRect(c * cw + cw * 0.04, r * ch + ch * 0.04, cw * 0.92, ch * 0.92, cw * 0.1);
-        ctx.fillStyle = "#fffdfa";
+        ctx.fillStyle = CREAM;
         ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(32,38,43,0.12)";
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(32,38,43,0.10)";
         ctx.stroke();
       }
     }

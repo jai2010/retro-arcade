@@ -177,9 +177,12 @@
   const GRID = 4;
   const PAIRS = (GRID * GRID) / 2;
   const KEY = "memory.best.v1";
-  const INK = "#20262b";
-  const SHADOW = "rgba(32,38,43,0.18)";
-  const ICON_COLORS = ["#e5724c", "#3f9b91", "#e6b34d", "#4d7bb0", "#e5724c", "#3f9b91", "#e6b34d", "#4d7bb0"];
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
+  // Eight distinct illustrated marks; shape carries the match, colour supports it.
+  const ICON_COLORS = [CORAL, TEAL, GOLD, INK, CORAL, TEAL, GOLD, INK];
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -326,26 +329,48 @@
     ctx.closePath();
   }
 
-  function inkedShape(color, lineWidth) {
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
+  function paintCard(x, y, w, h, r, color, band) {
+    roundRect(x, y, w, h, r);
     ctx.fillStyle = color;
-    ctx.shadowColor = SHADOW;
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
     ctx.fill();
-    ctx.shadowColor = "rgba(32,38,43,0)";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.lineWidth = lineWidth || 2;
-    ctx.strokeStyle = INK;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = band || TINTS[color] || CREAM;
+    ctx.fillRect(x, y, w, Math.max(2, h * 0.24));
+    ctx.restore();
+    ctx.lineWidth = 3;
     ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
     ctx.stroke();
+  }
+
+  function drawOverlay(title, hint) {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, W - 20, H - 20);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK;
+    ctx.font = "700 " + Math.max(17, Math.min(26, W * 0.065)) + "px monospace";
+    ctx.fillText(title, W / 2, H / 2 - 6);
+    ctx.fillStyle = CORAL;
+    ctx.fillRect(W / 2 - 34, H / 2 + 4, 68, 3);
+    ctx.font = Math.max(10, Math.min(13, W * 0.033)) + "px monospace";
+    ctx.fillStyle = INK;
+    hint.split(" — ").forEach((part, i) => {
+      ctx.fillText(part, W / 2, H / 2 + 28 + i * 18);
+    });
   }
 
   // Eight distinct vector symbols so matching reads by shape, not just colour.
   function drawIcon(id, cx, cy, r) {
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.lineWidth = Math.max(1.5, r * 0.09);
+    ctx.lineWidth = Math.max(2, r * 0.11);
     ctx.strokeStyle = INK;
     ctx.fillStyle = ICON_COLORS[id];
     ctx.lineJoin = "round";
@@ -383,7 +408,7 @@
     }
     if (id === 6) {
       ctx.beginPath(); ctx.moveTo(-r * 0.62, r * 0.62); ctx.lineTo(r * 0.62, -r * 0.62);
-      ctx.strokeStyle = "rgba(32,38,43,0.55)"; ctx.lineWidth = Math.max(1, r * 0.06); ctx.stroke();
+      ctx.strokeStyle = CREAM; ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.stroke();
     }
     ctx.restore();
   }
@@ -400,20 +425,15 @@
     const bx = -w / 2, by = -h / 2;
 
     if (card.faceUp) {
-      roundRect(bx, by, w, h, radius);
-      inkedShape("#fffdfa", 2);
-      ctx.fillStyle = "rgba(255,253,250,0.5)";
-      roundRect(bx + w * 0.12, by + h * 0.08, w * 0.76, h * 0.09, h * 0.045);
-      ctx.fill();
+      paintCard(bx, by, w, h, radius, CREAM, PAPER);
       drawIcon(card.id, 0, 0, Math.min(w, h) * 0.27);
     } else {
-      roundRect(bx, by, w, h, radius);
-      inkedShape("#3f9b91", 2);
+      paintCard(bx, by, w, h, radius, TEAL);
       roundRect(bx + w * 0.1, by + h * 0.1, w * 0.8, h * 0.8, radius * 0.6);
-      ctx.strokeStyle = "rgba(255,253,250,0.7)";
+      ctx.strokeStyle = CREAM;
       ctx.lineWidth = 2;
       ctx.stroke();
-      ctx.fillStyle = "rgba(255,253,250,0.9)";
+      ctx.fillStyle = CREAM;
       ctx.font = "700 " + Math.round(Math.min(w, h) * 0.4) + "px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -423,16 +443,22 @@
   }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
     const cw = W / GRID, ch = H / GRID;
+
+    ctx.strokeStyle = "rgba(32,38,43,0.10)";
+    ctx.lineWidth = 1.5;
+    for (let i = 1; i < GRID; i++) {
+      ctx.beginPath(); ctx.moveTo(i * cw + .5, 0); ctx.lineTo(i * cw + .5, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * ch + .5); ctx.lineTo(W, i * ch + .5); ctx.stroke();
+    }
 
     if (!isPhone) {
       const r = Math.floor(cursor / GRID), c = cursor % GRID;
       roundRect(c * cw + cw * 0.02, r * ch + ch * 0.02, cw * 0.96, ch * 0.96, cw * 0.12);
-      ctx.fillStyle = "rgba(229,114,76,0.08)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(229,114,76,0.55)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = CORAL;
+      ctx.lineWidth = 3;
       ctx.stroke();
     }
 
@@ -442,23 +468,11 @@
     });
 
     if (paused || phase === "won") {
-      ctx.fillStyle = "rgba(255,253,250,0.90)";
-      ctx.fillRect(0, 0, W, H);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
       const title = phase === "won" ? (newRecord ? "New record!" : "You win!") : "Paused";
-      let hint;
-      if (phase === "won") {
-        hint = moves + " moves · " + Math.floor(elapsed) + "s — " + (isPhone ? "tap to play again" : "press R or tap to play again");
-      } else {
-        hint = "Tap Pause to resume";
-      }
-      ctx.fillStyle = INK;
-      ctx.font = "700 " + Math.max(17, Math.min(26, W * 0.065)) + "px monospace";
-      ctx.fillText(title, W / 2, H / 2 - 6);
-      ctx.font = Math.max(10, Math.min(13, W * 0.033)) + "px monospace";
-      ctx.fillStyle = "rgba(32,38,43,0.62)";
-      ctx.fillText(hint, W / 2, H / 2 + 20);
+      const hint = phase === "won"
+        ? moves + " moves · " + Math.floor(elapsed) + "s — " + (isPhone ? "tap to play again" : "press R or tap to play again")
+        : "Tap Pause to resume";
+      drawOverlay(title, hint);
     }
   }
 

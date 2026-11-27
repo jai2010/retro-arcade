@@ -681,19 +681,29 @@
   const MAX_LOCK_RESETS = 15;
   const KICKS = [[0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [0, -1]];
 
-  // Seven distinct hues from the reference illustration, kept readable on paper.
-  const COLORS = {
-    I: "#e5724c",
-    O: "#e6b34d",
-    T: "#3f9b91",
-    S: "#7ca85c",
-    Z: "#d46863",
-    J: "#4d7bb0",
-    L: "#b57b49"
-  };
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const CORAL_LT = "#f0a17f", TEAL_LT = "#75bdb2", GOLD_LT = "#f2cf7a";
+  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT };
 
-  const INK = "#20262b";
-  const SHADOW = "rgba(32,38,43,0.18)";
+  // Seven pieces from the palette; the three extra hues are its own tints and
+  // small ink marks keep every piece readable once it has landed.
+  const COLORS = {
+    I: CORAL,
+    O: GOLD,
+    T: TEAL,
+    S: CORAL_LT,
+    Z: GOLD_LT,
+    J: TEAL_LT,
+    L: CREAM
+  };
+  const MARKS = {
+    [CORAL]: "bar", [CORAL_LT]: "dots",
+    [GOLD]: "none", [GOLD_LT]: "dots",
+    [TEAL]: "none", [TEAL_LT]: "bar",
+    [CREAM]: "notch"
+  };
 
   // Four rotation states per piece, as [x, y] cells inside a small box.
   const SHAPES = {
@@ -911,7 +921,7 @@
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed - 70,
           life: 1,
-          color: Math.random() < 0.35 ? "#fffdfa" : cell.color,
+          color: Math.random() < 0.35 ? CREAM : cell.color,
           size: 2 + Math.random() * 5
         });
       }
@@ -921,7 +931,7 @@
 
   function addPopup(text, y, color) {
     if (reducedMotion) return;
-    popups.push({ text, x: (COLS * CELL) / 2, y, color: color || "#20262b", life: 1 });
+    popups.push({ text, x: (COLS * CELL) / 2, y, color: color || INK, life: 1 });
   }
 
   function blast(rows, colors) {
@@ -962,7 +972,7 @@
       const kept = board.filter((_, y) => !full.includes(y));
       board = Array.from({ length: full.length }, () => Array(COLS).fill(null)).concat(kept);
 
-      addPopup("+" + points, full[0] * CELL + CELL / 2, "#20262b");
+      addPopup("+" + points, full[0] * CELL + CELL / 2, INK);
       announce(full.length + (full.length === 1 ? " line cleared" : " lines cleared"));
 
       const newLevel = Math.floor(lines / 10) + 1;
@@ -1037,32 +1047,51 @@
     ctx.closePath();
   }
 
+  // Flat palette fill, thick ink outline and a lighter top band — the same
+  // construction used by the arcade thumbnail illustrations.
   function drawBlock(ctx, x, y, color) {
     const pad = 1.5;
     const size = CELL - pad * 2;
-    roundRect(ctx, x + pad, y + pad, size, size, 5);
-    ctx.shadowColor = SHADOW;
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
+    const bx = x + pad, by = y + pad;
+    roundRect(ctx, bx, by, size, size, 5);
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.shadowColor = "rgba(32,38,43,0)";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(bx, by, size, Math.max(3, size * 0.24));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    ctx.fillStyle = "rgba(255,253,250,0.4)";
-    roundRect(ctx, x + pad + 4, y + pad + 4, size - 8, 4, 2);
-    ctx.fill();
+
+    // Small pattern marks keep the seven hues distinct on the stack.
+    const mark = MARKS[color];
+    const mx = bx + size / 2, my = by + size * 0.62;
+    ctx.fillStyle = INK;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    if (mark === "dots") {
+      for (const dx of [-4, 4]) {
+        ctx.beginPath(); ctx.arc(mx + dx, my, 2, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (mark === "bar") {
+      ctx.beginPath(); ctx.moveTo(mx - 6, my); ctx.lineTo(mx + 6, my); ctx.stroke();
+    } else if (mark === "notch") {
+      ctx.beginPath();
+      ctx.moveTo(mx - 5, my - 3); ctx.lineTo(mx + 5, my - 3); ctx.lineTo(mx, my + 4);
+      ctx.closePath(); ctx.fill();
+    }
   }
 
   function drawBoard(now) {
     const W = COLS * CELL;
     const H = ROWS * CELL;
-    boardCtx.clearRect(0, 0, W, H);
+    boardCtx.fillStyle = PAPER;
+    boardCtx.fillRect(0, 0, W, H);
 
-    boardCtx.strokeStyle = "rgba(32,38,43,0.06)";
+    boardCtx.strokeStyle = "rgba(32,38,43,0.10)";
     boardCtx.lineWidth = 1;
     for (let x = 1; x < COLS; x++) {
       boardCtx.beginPath();
@@ -1090,21 +1119,8 @@
       }
     }
 
-    // In-context signifier: gestures have no visible affordance otherwise.
-    if (!paused && now < hintUntil) {
-      boardCtx.fillStyle = "rgba(255,253,250,0.82)";
-      roundRect(boardCtx, 8, H - 54, W - 16, 44, 8);
-      boardCtx.fill();
-      boardCtx.fillStyle = "#626a6f";
-      boardCtx.font = "10px monospace";
-      boardCtx.textAlign = "center";
-      boardCtx.fillText("SWIPE SIDEWAYS: MOVE   ·   TAP: ROTATE", W / 2, H - 36);
-      boardCtx.fillText("SWIPE DOWN: DROP   ·   SWIPE UP: HOLD", W / 2, H - 20);
-    }
-
     if (now < flashUntil) {
-      const alpha = 0.55 * (1 - (flashUntil - now) / 240);
-      boardCtx.fillStyle = "rgba(255,253,250," + Math.max(0, alpha) + ")";
+      boardCtx.fillStyle = GOLD_LT;
       for (const y of flashRows) boardCtx.fillRect(0, y * CELL, W, CELL);
     }
 
@@ -1127,14 +1143,19 @@
     boardCtx.globalAlpha = 1;
 
     if (paused || gameOver) {
-      boardCtx.fillStyle = "rgba(255,253,250,0.88)";
+      boardCtx.fillStyle = PAPER;
       boardCtx.fillRect(0, 0, W, H);
-      boardCtx.fillStyle = "#20262b";
+      boardCtx.strokeStyle = INK;
+      boardCtx.lineWidth = 4;
+      boardCtx.strokeRect(10, 10, W - 20, H - 20);
+      boardCtx.fillStyle = INK;
       boardCtx.font = "700 28px monospace";
       boardCtx.textAlign = "center";
       boardCtx.fillText(gameOver ? "Game over" : "Paused", W / 2, H / 2 - 4);
+      boardCtx.fillStyle = CORAL;
+      boardCtx.fillRect(W / 2 - 34, H / 2 + 4, 68, 3);
       boardCtx.font = "14px monospace";
-      boardCtx.fillStyle = "rgba(32,38,43,0.62)";
+      boardCtx.fillStyle = INK;
       boardCtx.fillText(gameOver ? "Tap New game" : "Tap Pause to resume", W / 2, H / 2 + 26);
     }
   }
@@ -1143,7 +1164,7 @@
     ctx.clearRect(0, 0, 120, 90);
     if (!type) {
       ctx.save();
-      ctx.strokeStyle = "rgba(32,38,43,0.14)";
+      ctx.strokeStyle = "rgba(32,38,43,0.10)";
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 5]);
       roundRect(ctx, 34, 21, 52, 48, 8);
