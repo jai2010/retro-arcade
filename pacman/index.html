@@ -538,8 +538,9 @@
     updateStats();
   }
 
-  // Pac-Man advances exactly one tile per input; this is only the animation speed of that step.
-  function pacSpeed() { return Math.min(110, 70 + (level - 1) * 4); }
+  // Every tile takes exactly the same time. Pac-Man keeps stepping in the
+  // current direction until a new direction is requested or a wall is reached.
+  const PAC_STEP_MS = 240;
   // Ghosts keep moving on their own, but slowly enough to be dodged one step at a time.
   function ghostSpeed() { return Math.min(30, 14 + (level - 1) * 2); }
 
@@ -648,15 +649,24 @@
       ready = false;
     }
 
-    // One input = one pellet. Advance only while the current step animates.
+    // One tile at a time, always at the same pace. At each tile boundary the
+    // queued direction takes effect if it is open; otherwise movement continues.
     if (pac.moving) {
-      pac.t += pacSpeed() * dt / TILE;
+      pac.t += dt / PAC_STEP_MS;
       if (pac.t >= 1) {
         pac.tx = pac.nx;
         pac.ty = pac.ny;
-        pac.moving = false;
         pac.t = 0;
         eatPellet();
+        const want = pac.want || { x: 0, y: 0 };
+        if (!sameDir(want, { x: 0, y: 0 }) && walkablePac(pac.tx + want.x, pac.ty + want.y)) pac.dir = want;
+        if (!sameDir(pac.dir, { x: 0, y: 0 }) && walkablePac(pac.tx + pac.dir.x, pac.ty + pac.dir.y)) {
+          pac.nx = pac.tx + pac.dir.x;
+          pac.ny = pac.ty + pac.dir.y;
+          pac.moving = true;
+        } else {
+          pac.moving = false;
+        }
       }
     }
 
@@ -884,8 +894,11 @@
     ready = false;
     pac.want = { x, y };
     if (pac.moving) return;
-    const d = { x, y };
-    if (!walkablePac(pac.tx + d.x, pac.ty + d.y)) return;
+    const wanted = { x, y };
+    const d = walkablePac(pac.tx + wanted.x, pac.ty + wanted.y)
+      ? wanted
+      : (walkablePac(pac.tx + pac.dir.x, pac.ty + pac.dir.y) ? pac.dir : null);
+    if (!d) return;
     pac.dir = d;
     pac.nx = pac.tx + d.x;
     pac.ny = pac.ty + d.y;
