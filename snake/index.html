@@ -425,6 +425,9 @@
 (() => {
   "use strict";
 
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
   const GRID = 20;
   const CELL = 15;
   const SIZE = GRID * CELL;
@@ -700,6 +703,7 @@
   };
 
   window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
     if (keys[e.key]) { e.preventDefault(); setDirection(keys[e.key][0], keys[e.key][1]); return; }
     if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); return; }
     if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); }

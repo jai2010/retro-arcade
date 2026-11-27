@@ -302,6 +302,9 @@
 (() => {
   "use strict";
 
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
   const TILE = 18;
   const MAZE = [
     "###################",
@@ -416,7 +419,7 @@
     pauseBtn.textContent = "Pause";
     pauseBtn.setAttribute("aria-pressed", "false");
     updateStats();
-    announce("New game. Press an arrow or swipe to start.");
+    announce(phoneMode.matches ? "New game. Swipe or tap a control to start." : "New game. Press an arrow or swipe to start.");
     canvas.focus({ preventScroll: true });
   }
 
@@ -771,6 +774,7 @@
     A: [-1, 0], D: [1, 0], W: [0, -1], S: [0, 1]
   };
   window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
     if (keys[e.key]) { e.preventDefault(); setDir(keys[e.key][0], keys[e.key][1]); return; }
     if (e.key === "p" || e.key === "P") { e.preventDefault(); pauseBtn.click(); return; }
     if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); }

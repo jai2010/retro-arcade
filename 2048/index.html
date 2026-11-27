@@ -423,6 +423,9 @@
 (() => {
   "use strict";
 
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
   const GRID = 4;
   const KEY = "2048.best.v1";
 
@@ -745,6 +748,7 @@
   };
 
   window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
     if (keys[e.key]) {
       e.preventDefault();
       move(keys[e.key][0], keys[e.key][1]);

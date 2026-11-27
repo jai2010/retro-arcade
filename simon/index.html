@@ -434,6 +434,9 @@
 (() => {
   "use strict";
 
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
   const KEY = "simon.best.v1";
   const COLORS = ["#e5724c", "#3f9b91", "#e6b34d", "#4d7bb0"];
   const LABELS = ["1", "2", "3", "4"];
@@ -587,8 +590,8 @@
       ctx.textBaseline = "alphabetic";
       let title, hint;
       if (paused) { title = "Paused"; hint = "Tap Pause to resume"; }
-      else if (phase === "over") { title = "Game over"; hint = "Score " + score + " — press R or tap a pad"; }
-      else { title = "Simon"; hint = "Tap a pad or press 1-4 to begin"; }
+      else if (phase === "over") { title = "Game over"; hint = "Score " + score + (phoneMode.matches ? " — tap a pad" : " — press R or tap a pad"); }
+      else { title = "Simon"; hint = phoneMode.matches ? "Tap a pad to begin" : "Tap a pad or press 1-4 to begin"; }
       ctx.fillStyle = "#20262b";
       ctx.font = "700 22px monospace";
       ctx.fillText(title, size / 2, size / 2 - 6);
@@ -721,6 +724,7 @@
   const keyPad = { "1": 0, "2": 1, "3": 2, "4": 3, "q": 0, "w": 1, "a": 2, "s": 3 };
 
   window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
     let pad = keyPad[e.key];
     if (pad === undefined && e.key.length === 1) pad = keyPad[e.key.toLowerCase()];
     if (pad !== undefined) { e.preventDefault(); handlePad(pad); return; }

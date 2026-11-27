@@ -593,6 +593,9 @@
 (() => {
   "use strict";
 
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
   const COLS = 10;
   const ROWS = 20;
   const CELL = 30;
@@ -1165,6 +1168,7 @@
   };
 
   window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
     const action = keyMap[e.key];
     if (!action) return;
     const onButton = document.activeElement && document.activeElement.tagName === "BUTTON";
@@ -1176,7 +1180,12 @@
   });
 
   window.addEventListener("keyup", e => {
+    if (phoneMode.matches) return;
     if (e.key === "ArrowDown") { e.preventDefault(); softDrop = false; }
+  });
+
+  phoneMode.addEventListener("change", e => {
+    if (e.matches) softDrop = false;
   });
 
   // Board gestures: swipe to move, tap to rotate, flick down to drop, swipe up to hold.

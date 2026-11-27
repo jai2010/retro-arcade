@@ -534,6 +534,9 @@
 (() => {
   "use strict";
 
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
   // ---- Rules and tuning ----------------------------------------------------
   const TARGET = 11;
   const PAD_X_FRAC = 0.035;     // paddle inset from each side
@@ -874,7 +877,7 @@
       drawOverlay(scoreYou > scoreAi ? "You win the round" : "AI wins the round",
         wins + " wins · " + losses + " losses — tap to play again", true);
     } else if (paused) {
-      drawOverlay("Paused", "Tap or press P to resume", false);
+      drawOverlay("Paused", phoneMode.matches ? "Tap Pause to resume" : "Tap or press P to resume", false);
     } else if (!started) {
       drawOverlay("Pong", "Tap to start", false);
     } else if (awaitingServe) {
@@ -946,6 +949,7 @@
   };
 
   window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
     const onButton = document.activeElement && document.activeElement.tagName === "BUTTON";
     if (onButton && (e.key === " " || e.key === "Enter")) return;
     const action = keyMap[e.key];
@@ -958,11 +962,16 @@
   });
 
   window.addEventListener("keyup", e => {
+    if (phoneMode.matches) return;
     const action = keyMap[e.key];
     if (action === "up" || action === "down") {
       e.preventDefault();
       keys[action] = false;
     }
+  });
+
+  phoneMode.addEventListener("change", e => {
+    if (e.matches) { keys.up = false; keys.down = false; }
   });
 
   // ---- Boot ----------------------------------------------------------------

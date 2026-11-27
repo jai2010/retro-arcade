@@ -531,6 +531,9 @@
 (() => {
   "use strict";
 
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
   const W = 320;
   const H = 400;
   const COLS = 8;
@@ -989,6 +992,7 @@
   };
 
   window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
     const action = keyMap[e.key];
     if (!action) return;
     const onButton = document.activeElement && document.activeElement.tagName === "BUTTON";
@@ -1000,8 +1004,13 @@
   });
 
   window.addEventListener("keyup", e => {
+    if (phoneMode.matches) return;
     if (e.key === "ArrowLeft") keyLeft = false;
     if (e.key === "ArrowRight") keyRight = false;
+  });
+
+  phoneMode.addEventListener("change", e => {
+    if (e.matches) { keyLeft = false; keyRight = false; }
   });
 
   window.addEventListener("resize", setupCanvas);

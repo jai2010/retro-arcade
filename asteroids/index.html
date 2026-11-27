@@ -583,6 +583,9 @@
 (() => {
   "use strict";
 
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
   const WORLD = 900;
   const TAU = Math.PI * 2;
   const SHIP_R = 14;
@@ -1232,6 +1235,7 @@
   };
 
   window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
     const action = keyMap[e.key];
     if (!action) return;
     const onButton = document.activeElement && document.activeElement.tagName === "BUTTON";
@@ -1243,12 +1247,17 @@
   });
 
   window.addEventListener("keyup", e => {
+    if (phoneMode.matches) return;
     const action = keyMap[e.key];
     if (!action || action === "pause" || action === "restart") return;
     const onButton = document.activeElement && document.activeElement.tagName === "BUTTON";
     if (onButton && (e.key === " " || e.key === "Enter")) return;
     e.preventDefault();
     setControl(action, false);
+  });
+
+  phoneMode.addEventListener("change", e => {
+    if (e.matches) clearControls();
   });
 
   window.addEventListener("blur", clearControls);
