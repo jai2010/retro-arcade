@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Minesweeper</title>
+<style>
+  :root {
+    --paper: #f7f4ee; --ink: #20262b; --muted: rgba(32,38,43,0.62); --accent: #e5724c;
+    --accent-dark: #20262b; --teal: #3f9b91; --sand: #ede7dc; --line: #ede7dc;
+    --surface: #fffdfa; --radius: 12px; --radius-sm: 8px;
+    --retro-font: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: var(--ink); background-color: var(--paper);
+    background-image: radial-gradient(circle at 50% -10%, rgba(229,114,76,.10), transparent 60%), radial-gradient(rgba(128,128,128,.055) .7px, transparent .7px);
+    background-size: auto, 6px 6px; font: 13px/1.5 var(--retro-font); overflow: hidden;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:5; background:repeating-linear-gradient(180deg, rgba(128,128,128,.035) 0 1px, transparent 1px 4px); }
+  body[data-theme="dark"] { --paper:#171b1e; --ink:#f7f4ee; --muted:#aab2b7; --line:rgba(247,244,238,.22); --surface:#20262b; --sand:#2b3237; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .shell {
+    --board-w: min(calc(100dvh - 150px), 700px); --side-w: 270px;
+    --gap: clamp(12px, 2vw, 24px); --content-w: calc(var(--board-w) + var(--gap) + var(--side-w));
+    position:relative; z-index:1; height:100dvh; max-width:1080px; margin:0 auto;
+    padding:clamp(10px,1.8vh,22px) clamp(14px,2vw,30px) clamp(10px,1.6vh,18px);
+    display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; gap:clamp(8px,1.4vh,16px);
+  }
+  header { width:min(100%,var(--content-w)); margin-inline:auto; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-direction:row !important; min-height:52px; padding-bottom:10px; border-bottom:2px solid var(--ink); }
+  header h1 { font:800 24px/1 var(--retro-font); text-transform:uppercase; letter-spacing:.08em; margin:0; }
+  header .tagline { margin:4px 0 0; font-size:11px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:44ch; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .actions { display:flex; gap:8px; flex-wrap:nowrap; justify-content:flex-end; }
+  button, .actions a.back { font:600 12px/1.5 var(--retro-font); text-transform:uppercase; letter-spacing:.05em; color:var(--ink); background:var(--surface); border:2px solid var(--ink); border-radius:var(--radius-sm); box-shadow:0 2px 0 rgba(32,38,43,.18); padding:8px 14px; min-height:44px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; transition:transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease; }
+  button:hover, .actions a.back:hover { transform:translateY(-2px); box-shadow:0 6px 14px rgba(32,38,43,.10); border-color:var(--teal); }
+  button:active, .actions a.back:active { transform:translateY(1px); box-shadow:none; }
+  button.primary { background:var(--accent); color:#fffdfa; }
+  button.primary:hover { background:var(--accent-dark); }
+  .joystick { width:44px; height:44px; min-height:44px; padding:0; border-radius:50%; background:var(--surface); border:2px solid var(--line); display:grid; place-items:center; }
+  .joystick .stick { display:block; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid rgba(32,38,43,.65); transform:translateY(-5px); transition:transform 180ms ease; }
+  .joystick[aria-checked="true"] .stick { transform:translateY(5px); }
+  .joystick:hover { border-color:var(--accent); }
+  .game { width:min(100%,var(--content-w)); margin-inline:auto; display:grid; grid-template-columns:minmax(0,var(--board-w)) var(--side-w); gap:var(--gap); align-items:start; flex:1 1 auto; min-height:0; }
+  .play { width:100%; min-width:0; display:flex; flex-direction:column; gap:clamp(8px,1.2vh,12px); }
+  .hud { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; background:var(--surface); border:2px solid var(--ink); border-radius:var(--radius); }
+  .score-block { display:flex; align-items:baseline; gap:8px; }
+  .score-label { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); }
+  #score { font-size:clamp(24px,3.2vh,36px); line-height:1; font-weight:800; font-variant-numeric:tabular-nums; color:var(--accent); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .chip { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); background:var(--sand); border-radius:999px; padding:4px 9px; white-space:nowrap; }
+  .chip b { color:var(--ink); font-variant-numeric:tabular-nums; }
+  .chip.best b { color:var(--accent); }
+  .board-wrap { position:relative; aspect-ratio:1/1; width:100%; background:var(--sand); border:2px solid var(--ink); border-radius:var(--radius); box-shadow:0 10px 24px rgba(32,38,43,0.14); padding:8px; }
+  canvas { display:block; width:100%; height:100%; border-radius:var(--radius-sm); background:#fffdfa; touch-action:none; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .side { width:100%; display:flex; flex-direction:column; gap:clamp(8px,1.3vh,14px); max-height:calc(100dvh - 120px); overflow-y:auto; padding-right:2px; }
+  .panel { background:var(--surface); border:2px solid var(--ink); border-radius:var(--radius); box-shadow:0 6px 16px rgba(32,38,43,0.10); padding:clamp(9px,1.3vh,14px); }
+  .panel h2 { margin:0 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  .help, .hint, .record { margin:0 0 8px; color:var(--muted); font-size:12px; }
+  .help:last-child, .hint:last-child, .record:last-child { margin-bottom:0; }
+  .record b { color:var(--accent); font-variant-numeric:tabular-nums; }
+  @media (max-width:760px) {
+    body { overflow:auto; }
+    .shell { height:auto; min-height:100dvh; }
+    header, .game, .play { width:100%; }
+    header { align-items:flex-start; flex-direction:column; }
+    .game { grid-template-columns:1fr; }
+    .side { max-height:none; overflow:visible; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .side .panel:last-child { grid-column:1 / -1; }
+    header .tagline { display:none !important; }
+    header h1 { font-size:18px !important; }
+    .actions { flex-wrap:nowrap !important; justify-content:flex-end !important; gap:4px !important; }
+    .actions button, .actions a.back { min-height:36px !important; padding:5px 7px !important; font-size:10px !important; }
+    .joystick { width:40px !important; height:40px !important; min-height:40px !important; }
+    .hud { padding:6px 10px !important; gap:6px !important; width:100% !important; }
+    .chip { font-size:10px !important; padding:3px 7px !important; }
+    .help, .hint { display:none !important; }
+  }
+  @media (prefers-reduced-motion:reduce) { *, *::before, *::after { transition-duration:0.01ms !important; } }
+  /* Phone layout: fit the board to the viewport, no on-screen button pads. */
+  .gesture-tip { display:none; }
+  html.no-touch-pad .shell { max-width:none !important; padding:8px 4px 14px !important; }
+  html.no-touch-pad header, html.no-touch-pad .game { width:100% !important; max-width:none !important; }
+  html.no-touch-pad .game { grid-template-columns:1fr !important; grid-template-rows:1fr !important; align-items:stretch !important; }
+  html.no-touch-pad .play { width:100% !important; height:100%; justify-content:flex-start; }
+  html.no-touch-pad .play .hud { width:100% !important; }
+  html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%,calc((100dvh - 170px) * 1.0000)) !important; margin-inline:auto !important; }
+  html.no-touch-pad .side { display:none !important; }
+  html.no-touch-pad .gesture-tip {
+    display:none; position:fixed; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    z-index:30; align-items:center; gap:12px; width:min(92vw,420px); max-width:min(92vw,420px);
+    padding:9px 10px 9px 14px; border:1px solid rgba(128,128,128,.35); border-radius:14px;
+    background:var(--surface,#fffdfa); box-shadow:0 8px 24px rgba(0,0,0,.25);
+    color:var(--muted,currentColor); font:12px/1.35 var(--retro-font,monospace); text-align:center;
+  }
+  html.no-touch-pad .gesture-tip.is-open { display:flex; }
+  .tip-close { flex:0 0 auto; width:30px; height:30px; padding:0; border:1px solid rgba(128,128,128,.35); border-radius:50%; background:transparent; color:inherit; font:18px/1 monospace; cursor:pointer; }
+  @media (max-height:520px) and (pointer:coarse) {
+    html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%,calc((100dvh - 140px) * 1.0000)) !important; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div>
+      <h1>Minesweeper</h1>
+      <p class="tagline">Nine by nine. Ten mines. One careful tap.</p>
+    </div>
+    <div class="actions">
+      <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights"><span class="stick" aria-hidden="true"></span></button>
+      <a class="back" href="../index.html" aria-label="Back to arcade">← Arcade</a>
+      <button id="pauseBtn" type="button" aria-pressed="false">Pause</button>
+      <button id="newBtn" class="primary" type="button">New game</button>
+    </div>
+  </header>
+
+  <main class="game">
+    <section class="play">
+      <div class="hud" aria-live="polite">
+        <div class="score-block"><span class="score-label">Time</span><strong id="score">0s</strong></div>
+        <div class="chips">
+          <span class="chip">Mines <b id="mines">10</b></span>
+          <span class="chip">Flags <b id="flags">0</b></span>
+          <span class="chip best">Best <b id="best">0s</b></span>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <canvas id="game" tabindex="0" role="img" aria-label="Minesweeper playfield, 9 by 9 grid with 10 mines">Your browser does not support canvas.</canvas>
+      </div>
+      <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
+        <span>Tap to reveal · long-press to flag</span>
+        <button type="button" class="tip-close" aria-label="Close controls tip">×</button>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Instructions">
+      <section class="panel">
+        <h2>How to play</h2>
+        <p class="help">Tap a square to reveal it. Numbers show how many of the eight neighbours are mined. Empty squares open a whole region. Your first tap is always safe. Clear every safe square to win.</p>
+        <p class="hint">Long-press a square (or right-click) to plant a flag. Desktop: arrows move, Enter reveals, F flags, P pauses, R restarts.</p>
+        <p class="record">Fastest clear <b id="sideBest">0s</b></p>
+      </section>
+    </aside>
+  </main>
+
+  <p id="announce" class="sr-only" aria-live="polite"></p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
+  // Phones play by tapping the board, so hide the on-screen button pads.
+  if (phoneMode.matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches)) {
+    document.documentElement.classList.add("no-touch-pad");
+  }
+  const isPhone = document.documentElement.classList.contains("no-touch-pad");
+  // Controls tip is a dismissible bubble, not a persistent part of the layout.
+  const tip = document.getElementById("controlsTip");
+  if (tip) {
+    tip.querySelector(".tip-close").addEventListener("click", () => {
+      tip.classList.remove("is-open");
+    });
+    if (document.documentElement.classList.contains("no-touch-pad")) {
+      tip.classList.add("is-open");
+    }
+  }
+
+  const GRID = 9;
+  const MINES = 10;
+  const KEY = "minesweeper.best.v1";
+  const INK = "#20262b";
+  const NUM_COLORS = ["#3f9b91", "#4d7bb0", "#e5724c", "#e6b34d", "#20262b", "#3f9b91", "#4d7bb0", "#e5724c"];
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const minesEl = document.getElementById("mines");
+  const flagsEl = document.getElementById("flags");
+  const bestEl = document.getElementById("best");
+  const sideBestEl = document.getElementById("sideBest");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const announceEl = document.getElementById("announce");
+
+  let W = 300, H = 300;
+  let board = [], phase = "idle", paused = false;
+  let elapsed = 0, flags = 0, revealed = 0;
+  let best = loadBest(), newRecord = false;
+  let cursor = Math.floor(GRID / 2) * GRID + Math.floor(GRID / 2);
+  let press = null;
+  let lastTime = performance.now();
+
+  function loadBest() {
+    try {
+      const v = Number(window.localStorage.getItem(KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (_) { return 0; }
+  }
+  function saveBest(v) {
+    try { window.localStorage.setItem(KEY, String(v)); } catch (_) {}
+  }
+  function announce(text) { announceEl.textContent = text; }
+  function updateStats() {
+    const secs = Math.floor(elapsed);
+    scoreEl.textContent = secs + "s";
+    minesEl.textContent = String(MINES);
+    flagsEl.textContent = String(flags);
+    bestEl.textContent = best ? best + "s" : "0s";
+    sideBestEl.textContent = best ? best + "s" : "0s";
+  }
+  function forEachNeighbor(r, c, fn) {
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < GRID && nc >= 0 && nc < GRID) fn(nr, nc);
+      }
+    }
+  }
+
+  function emptyBoard() {
+    return Array.from({ length: GRID }, () =>
+      Array.from({ length: GRID }, () => ({ mine: false, revealed: false, flagged: false, wrong: false, count: 0 })));
+  }
+
+  function reset() {
+    board = emptyBoard();
+    phase = "idle"; paused = false;
+    elapsed = 0; flags = 0; revealed = 0; newRecord = false;
+    press = null;
+    pauseBtn.textContent = "Pause";
+    pauseBtn.setAttribute("aria-pressed", "false");
+    updateStats();
+    announce("New game. Tap a square to begin.");
+    canvas.focus({ preventScroll: true });
+    draw();
+  }
+
+  // Mines are laid after the first reveal, so that square and its neighbours are safe.
+  function placeMines(safeR, safeC) {
+    const spots = [];
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        if (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1) continue;
+        spots.push([r, c]);
+      }
+    }
+    for (let i = spots.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = spots[i]; spots[i] = spots[j]; spots[j] = tmp;
+    }
+    for (let i = 0; i < MINES; i++) {
+      const spot = spots[i];
+      board[spot[0]][spot[1]].mine = true;
+    }
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        let n = 0;
+        forEachNeighbor(r, c, (nr, nc) => { if (board[nr][nc].mine) n++; });
+        board[r][c].count = n;
+      }
+    }
+  }
+
+  function toggleFlag(r, c) {
+    if (phase === "over" || phase === "won" || paused) return;
+    const cell = board[r][c];
+    if (cell.revealed) return;
+    cell.flagged = !cell.flagged;
+    flags += cell.flagged ? 1 : -1;
+    updateStats();
+    announce(cell.flagged ? "Flag placed." : "Flag removed.");
+  }
+
+  function lose() {
+    phase = "over";
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        const cell = board[r][c];
+        if (cell.mine) cell.revealed = true;
+        else if (cell.flagged) cell.wrong = true;
+      }
+    }
+    announce("Boom! Game over in " + Math.floor(elapsed) + " seconds.");
+  }
+
+  function win() {
+    phase = "won";
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        if (board[r][c].mine && !board[r][c].flagged) {
+          board[r][c].flagged = true;
+          flags++;
+        }
+      }
+    }
+    const secs = Math.floor(elapsed);
+    if (best === 0 || secs < best) { best = secs; saveBest(best); newRecord = true; }
+    updateStats();
+    announce("Field cleared in " + secs + " seconds. Best " + best + " seconds.");
+  }
+
+  function reveal(r, c) {
+    const cell = board[r][c];
+    if (cell.revealed || cell.flagged) return;
+    if (phase === "idle") { placeMines(r, c); phase = "playing"; announce("Game started."); }
+    if (cell.mine) { cell.revealed = true; lose(); return; }
+
+    const stack = [[r, c]];
+    while (stack.length) {
+      const pos = stack.pop();
+      const cur = board[pos[0]][pos[1]];
+      if (cur.revealed || cur.flagged || cur.mine) continue;
+      cur.revealed = true;
+      revealed++;
+      if (cur.count === 0) {
+        forEachNeighbor(pos[0], pos[1], (nr, nc) => stack.push([nr, nc]));
+      }
+    }
+    if (revealed === GRID * GRID - MINES) win();
+    updateStats();
+  }
+
+  function tap(r, c) {
+    if (phase === "over" || phase === "won") { reset(); return; }
+    if (paused) return;
+    reveal(r, c);
+  }
+
+  function togglePause() {
+    if (phase === "over" || phase === "won") return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    pauseBtn.setAttribute("aria-pressed", String(paused));
+    announce(paused ? "Paused" : "Resumed");
+  }
+
+  function tick(dt) {
+    if (phase === "playing" && !paused) elapsed += dt / 1000;
+    if (press && !press.fired && !paused) {
+      press.left -= dt;
+      if (press.left <= 0) {
+        const p = press;
+        press = null;
+        toggleFlag(p.r, p.c);
+      }
+    }
+    updateStats();
+  }
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    const dpr = window.devicePixelRatio || 1;
+    const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+    if (bw === canvas.width && bh === canvas.height && w === W && h === H) return;
+    W = w; H = h;
+    canvas.width = bw; canvas.height = bh;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    const rad = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rad);
+    ctx.arcTo(x + w, y + h, x, y + h, rad);
+    ctx.arcTo(x, y + h, x, y, rad);
+    ctx.arcTo(x, y, x + w, y, rad);
+    ctx.closePath();
+  }
+
+  function drawFlag(cx, cy, s) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(1.5, s * 0.09);
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.14, cy + s * 0.55);
+    ctx.lineTo(cx - s * 0.14, cy - s * 0.58);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.14, cy - s * 0.58);
+    ctx.lineTo(cx + s * 0.55, cy - s * 0.28);
+    ctx.lineTo(cx - s * 0.14, cy + s * 0.05);
+    ctx.closePath();
+    ctx.fillStyle = "#e5724c";
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(1, s * 0.06);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.42, cy + s * 0.58);
+    ctx.lineTo(cx + s * 0.16, cy + s * 0.58);
+    ctx.stroke();
+  }
+
+  function drawMine(cx, cy, s) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(1.5, s * 0.09);
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * s * 0.38, cy + Math.sin(a) * s * 0.38);
+      ctx.lineTo(cx + Math.cos(a) * s * 0.66, cy + Math.sin(a) * s * 0.66);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, s * 0.42, 0, Math.PI * 2);
+    ctx.fillStyle = INK;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.13, cy - s * 0.14, s * 0.1, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,253,250,0.85)";
+    ctx.fill();
+  }
+
+  function draw() {
+    if (!board.length) return;
+    ctx.clearRect(0, 0, W, H);
+    const cw = W / GRID, ch = H / GRID;
+    const pad = Math.min(cw, ch) * 0.045;
+    const bw = cw - pad * 2, bh = ch - pad * 2;
+    const radius = Math.min(cw, ch) * 0.14;
+
+    if (!isPhone) {
+      const r = Math.floor(cursor / GRID), c = cursor % GRID;
+      roundRect(c * cw + pad * 0.4, r * ch + pad * 0.4, cw - pad * 0.8, ch - pad * 0.8, radius);
+      ctx.fillStyle = "rgba(229,114,76,0.08)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(229,114,76,0.55)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        const cell = board[r][c];
+        const x = c * cw + pad, y = r * ch + pad;
+        roundRect(x, y, bw, bh, radius);
+        if (cell.revealed) {
+          ctx.fillStyle = "#ede7dc";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(32,38,43,0.24)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          if (cell.mine) drawMine(x + bw / 2, y + bh / 2, Math.min(bw, bh) * 0.46);
+          else if (cell.count > 0) {
+            ctx.fillStyle = NUM_COLORS[cell.count - 1];
+            ctx.font = "700 " + Math.round(Math.min(bw, bh) * 0.56) + "px monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(String(cell.count), x + bw / 2, y + bh / 2 + Math.min(bw, bh) * 0.03);
+          }
+        } else {
+          ctx.fillStyle = "#fffdfa";
+          ctx.shadowColor = "rgba(32,38,43,0.18)";
+          ctx.shadowBlur = 5;
+          ctx.shadowOffsetY = 2;
+          ctx.fill();
+          ctx.shadowColor = "rgba(32,38,43,0)";
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.fillStyle = "rgba(255,253,250,0.55)";
+          roundRect(x + bw * 0.14, y + bh * 0.1, bw * 0.72, bh * 0.12, bh * 0.06);
+          ctx.fill();
+          if (cell.flagged) drawFlag(x + bw / 2, y + bh / 2, Math.min(bw, bh) * 0.52);
+          if (cell.wrong) {
+            ctx.strokeStyle = "#e5724c";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x + bw * 0.22, y + bh * 0.22);
+            ctx.lineTo(x + bw * 0.78, y + bh * 0.78);
+            ctx.moveTo(x + bw * 0.78, y + bh * 0.22);
+            ctx.lineTo(x + bw * 0.22, y + bh * 0.78);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    if (paused || phase === "idle" || phase === "over" || phase === "won") {
+      ctx.fillStyle = "rgba(255,253,250,0.90)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      const secs = Math.floor(elapsed);
+      const title = phase === "over" ? "Boom!" : phase === "won" ? (newRecord ? "New record!" : "Cleared!") : paused ? "Paused" : "Ready?";
+      let hint;
+      if (phase === "over") hint = "Hit a mine at " + secs + "s — " + (isPhone ? "tap to try again" : "press R or tap to try again");
+      else if (phase === "won") hint = secs + "s · best " + best + "s — " + (isPhone ? "tap to play again" : "press R or tap to play again");
+      else if (paused) hint = "Tap Pause to resume";
+      else hint = isPhone ? "Tap a square to begin" : "Tap a square or press Enter to begin";
+      ctx.fillStyle = INK;
+      ctx.font = "700 " + Math.max(17, Math.min(26, W * 0.065)) + "px monospace";
+      ctx.fillText(title, W / 2, H / 2 - 6);
+      ctx.font = Math.max(9, Math.min(13, W * 0.03)) + "px monospace";
+      ctx.fillStyle = "rgba(32,38,43,0.62)";
+      ctx.fillText(hint, W / 2, H / 2 + 20);
+    }
+  }
+
+  function loop(now) {
+    const dt = Math.min(now - lastTime, 100);
+    lastTime = now;
+    tick(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function cellAt(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
+    const c = Math.min(GRID - 1, Math.floor(x / (rect.width / GRID)));
+    const r = Math.min(GRID - 1, Math.floor(y / (rect.height / GRID)));
+    return { r: r, c: c };
+  }
+
+  canvas.addEventListener("pointerdown", e => {
+    if (e.button === 2) return;
+    const cell = cellAt(e);
+    if (!cell) return;
+    cursor = cell.r * GRID + cell.c;
+    press = { r: cell.r, c: cell.c, x: e.clientX, y: e.clientY, left: 450, fired: false };
+  });
+  canvas.addEventListener("pointermove", e => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 14) press = null;
+  });
+  canvas.addEventListener("pointerup", () => {
+    if (!press) return;
+    const p = press;
+    press = null;
+    if (!p.fired) tap(p.r, p.c);
+  });
+  canvas.addEventListener("pointercancel", () => { press = null; });
+  canvas.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    const cell = cellAt(e);
+    if (cell) toggleFlag(cell.r, cell.c);
+  });
+
+  pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
+  document.getElementById("newBtn").addEventListener("click", reset);
+
+  window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
+    const key = e.key;
+    if (key === "ArrowLeft" || key === "a" || key === "A") { e.preventDefault(); cursor = Math.floor(cursor / GRID) * GRID + Math.max(0, cursor % GRID - 1); return; }
+    if (key === "ArrowRight" || key === "d" || key === "D") { e.preventDefault(); cursor = Math.floor(cursor / GRID) * GRID + Math.min(GRID - 1, cursor % GRID + 1); return; }
+    if (key === "ArrowUp" || key === "w" || key === "W") { e.preventDefault(); cursor = Math.max(0, cursor - GRID); return; }
+    if (key === "ArrowDown" || key === "s" || key === "S") { e.preventDefault(); cursor = Math.min(GRID * GRID - 1, cursor + GRID); return; }
+    if (key === "Enter" || key === " ") { e.preventDefault(); tap(Math.floor(cursor / GRID), cursor % GRID); return; }
+    if (key === "f" || key === "F") { e.preventDefault(); toggleFlag(Math.floor(cursor / GRID), cursor % GRID); return; }
+    if (key === "p" || key === "P") { e.preventDefault(); togglePause(); return; }
+    if (key === "r" || key === "R") { e.preventDefault(); reset(); }
+  });
+
+  best = loadBest();
+  lastTime = performance.now();
+  resize();
+  reset();
+  window.addEventListener("resize", resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+  requestAnimationFrame(loop);
+})();
+</script>
+
+<script>
+(() => {
+  const btn = document.getElementById("lights");
+  if (!btn) return;
+  const KEY = "arcade.theme.v1";
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    btn.setAttribute("aria-checked", String(theme === "light"));
+    try { localStorage.setItem(KEY, theme); } catch (_) {}
+  }
+  let saved = "dark";
+  try { saved = localStorage.getItem(KEY) || "dark"; } catch (_) {}
+  setTheme(saved === "light" ? "light" : "dark");
+  btn.addEventListener("click", () => {
+    setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>

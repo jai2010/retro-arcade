@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Whack-a-Mole</title>
+<style>
+  :root {
+    --paper: #f7f4ee; --ink: #20262b; --muted: rgba(32,38,43,0.62); --accent: #e5724c;
+    --accent-dark: #20262b; --teal: #3f9b91; --sand: #ede7dc; --line: #ede7dc;
+    --surface: #fffdfa; --radius: 12px; --radius-sm: 8px;
+    --retro-font: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: var(--ink); background-color: var(--paper);
+    background-image: radial-gradient(circle at 50% -10%, rgba(229,114,76,.10), transparent 60%), radial-gradient(rgba(128,128,128,.055) .7px, transparent .7px);
+    background-size: auto, 6px 6px; font: 13px/1.5 var(--retro-font); overflow: hidden;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:5; background:repeating-linear-gradient(180deg, rgba(128,128,128,.035) 0 1px, transparent 1px 4px); }
+  body[data-theme="dark"] { --paper:#171b1e; --ink:#f7f4ee; --muted:#aab2b7; --line:rgba(247,244,238,.22); --surface:#20262b; --sand:#2b3237; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .shell {
+    --board-w: min(calc(100dvh - 150px), 700px); --side-w: 270px;
+    --gap: clamp(12px, 2vw, 24px); --content-w: calc(var(--board-w) + var(--gap) + var(--side-w));
+    position:relative; z-index:1; height:100dvh; max-width:1080px; margin:0 auto;
+    padding:clamp(10px,1.8vh,22px) clamp(14px,2vw,30px) clamp(10px,1.6vh,18px);
+    display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; gap:clamp(8px,1.4vh,16px);
+  }
+  header { width:min(100%,var(--content-w)); margin-inline:auto; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-direction:row !important; min-height:52px; padding-bottom:10px; border-bottom:2px solid var(--ink); }
+  header h1 { font:800 24px/1 var(--retro-font); text-transform:uppercase; letter-spacing:.08em; margin:0; }
+  header .tagline { margin:4px 0 0; font-size:11px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:44ch; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .actions { display:flex; gap:8px; flex-wrap:nowrap; justify-content:flex-end; }
+  button, .actions a.back { font:600 12px/1.5 var(--retro-font); text-transform:uppercase; letter-spacing:.05em; color:var(--ink); background:var(--surface); border:2px solid var(--ink); border-radius:var(--radius-sm); box-shadow:0 2px 0 rgba(32,38,43,.18); padding:8px 14px; min-height:44px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; transition:transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease; }
+  button:hover, .actions a.back:hover { transform:translateY(-2px); box-shadow:0 6px 14px rgba(32,38,43,.10); border-color:var(--teal); }
+  button:active, .actions a.back:active { transform:translateY(1px); box-shadow:none; }
+  button.primary { background:var(--accent); color:#fffdfa; }
+  button.primary:hover { background:var(--accent-dark); }
+  .joystick { width:44px; height:44px; min-height:44px; padding:0; border-radius:50%; background:var(--surface); border:2px solid var(--line); display:grid; place-items:center; }
+  .joystick .stick { display:block; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid rgba(32,38,43,.65); transform:translateY(-5px); transition:transform 180ms ease; }
+  .joystick[aria-checked="true"] .stick { transform:translateY(5px); }
+  .joystick:hover { border-color:var(--accent); }
+  .game { width:min(100%,var(--content-w)); margin-inline:auto; display:grid; grid-template-columns:minmax(0,var(--board-w)) var(--side-w); gap:var(--gap); align-items:start; flex:1 1 auto; min-height:0; }
+  .play { width:100%; min-width:0; display:flex; flex-direction:column; gap:clamp(8px,1.2vh,12px); }
+  .hud { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; background:var(--surface); border:2px solid var(--ink); border-radius:var(--radius); }
+  .score-block { display:flex; align-items:baseline; gap:8px; }
+  .score-label { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); }
+  #score { font-size:clamp(24px,3.2vh,36px); line-height:1; font-weight:800; font-variant-numeric:tabular-nums; color:var(--accent); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .chip { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); background:var(--sand); border-radius:999px; padding:4px 9px; white-space:nowrap; }
+  .chip b { color:var(--ink); font-variant-numeric:tabular-nums; }
+  .chip.best b { color:var(--accent); }
+  .board-wrap { position:relative; aspect-ratio:1/1; width:100%; background:var(--sand); border:2px solid var(--ink); border-radius:var(--radius); box-shadow:0 10px 24px rgba(32,38,43,0.14); padding:8px; }
+  canvas { display:block; width:100%; height:100%; border-radius:var(--radius-sm); background:#fffdfa; touch-action:none; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .side { width:100%; display:flex; flex-direction:column; gap:clamp(8px,1.3vh,14px); max-height:calc(100dvh - 120px); overflow-y:auto; padding-right:2px; }
+  .panel { background:var(--surface); border:2px solid var(--ink); border-radius:var(--radius); box-shadow:0 6px 16px rgba(32,38,43,0.10); padding:clamp(9px,1.3vh,14px); }
+  .panel h2 { margin:0 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  .help, .hint, .record { margin:0 0 8px; color:var(--muted); font-size:12px; }
+  .help:last-child, .hint:last-child, .record:last-child { margin-bottom:0; }
+  .record b { color:var(--accent); font-variant-numeric:tabular-nums; }
+  @media (max-width:760px) {
+    body { overflow:auto; }
+    .shell { height:auto; min-height:100dvh; }
+    header, .game, .play { width:100%; }
+    header { align-items:flex-start; flex-direction:column; }
+    .game { grid-template-columns:1fr; }
+    .side { max-height:none; overflow:visible; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .side .panel:last-child { grid-column:1 / -1; }
+    header .tagline { display:none !important; }
+    header h1 { font-size:18px !important; }
+    .actions { flex-wrap:nowrap !important; justify-content:flex-end !important; gap:4px !important; }
+    .actions button, .actions a.back { min-height:36px !important; padding:5px 7px !important; font-size:10px !important; }
+    .joystick { width:40px !important; height:40px !important; min-height:40px !important; }
+    .hud { padding:6px 10px !important; gap:6px !important; width:100% !important; }
+    .chip { font-size:10px !important; padding:3px 7px !important; }
+    .help, .hint { display:none !important; }
+  }
+  @media (prefers-reduced-motion:reduce) { *, *::before, *::after { transition-duration:0.01ms !important; } }
+  /* Phone layout: fit the board to the viewport, no on-screen button pads. */
+  .gesture-tip { display:none; }
+  html.no-touch-pad .shell { max-width:none !important; padding:8px 4px 14px !important; }
+  html.no-touch-pad header, html.no-touch-pad .game { width:100% !important; max-width:none !important; }
+  html.no-touch-pad .game { grid-template-columns:1fr !important; grid-template-rows:1fr !important; align-items:stretch !important; }
+  html.no-touch-pad .play { width:100% !important; height:100%; justify-content:flex-start; }
+  html.no-touch-pad .play .hud { width:100% !important; }
+  html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%,calc((100dvh - 170px) * 1.0000)) !important; margin-inline:auto !important; }
+  html.no-touch-pad .side { display:none !important; }
+  html.no-touch-pad .gesture-tip {
+    display:none; position:fixed; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    z-index:30; align-items:center; gap:12px; width:min(92vw,420px); max-width:min(92vw,420px);
+    padding:9px 10px 9px 14px; border:1px solid rgba(128,128,128,.35); border-radius:14px;
+    background:var(--surface,#fffdfa); box-shadow:0 8px 24px rgba(0,0,0,.25);
+    color:var(--muted,currentColor); font:12px/1.35 var(--retro-font,monospace); text-align:center;
+  }
+  html.no-touch-pad .gesture-tip.is-open { display:flex; }
+  .tip-close { flex:0 0 auto; width:30px; height:30px; padding:0; border:1px solid rgba(128,128,128,.35); border-radius:50%; background:transparent; color:inherit; font:18px/1 monospace; cursor:pointer; }
+  @media (max-height:520px) and (pointer:coarse) {
+    html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%,calc((100dvh - 140px) * 1.0000)) !important; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div>
+      <h1>Whack-a-Mole</h1>
+      <p class="tagline">Thirty seconds. Nine holes. Fast hands.</p>
+    </div>
+    <div class="actions">
+      <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights"><span class="stick" aria-hidden="true"></span></button>
+      <a class="back" href="../index.html" aria-label="Back to arcade">← Arcade</a>
+      <button id="pauseBtn" type="button" aria-pressed="false">Pause</button>
+      <button id="newBtn" class="primary" type="button">New game</button>
+    </div>
+  </header>
+
+  <main class="game">
+    <section class="play">
+      <div class="hud" aria-live="polite">
+        <div class="score-block"><span class="score-label">Score</span><strong id="score">0</strong></div>
+        <div class="chips">
+          <span class="chip">Time <b id="time">30</b></span>
+          <span class="chip">Miss <b id="misses">0</b></span>
+          <span class="chip best">Best <b id="best">0</b></span>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <canvas id="game" tabindex="0" role="img" aria-label="Whack-a-Mole playfield, 3 by 3 grid">Your browser does not support canvas.</canvas>
+      </div>
+      <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
+        <span>Tap a popping mole to score</span>
+        <button type="button" class="tip-close" aria-label="Close controls tip">×</button>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Instructions">
+      <section class="panel">
+        <h2>How to play</h2>
+        <p class="help">Moles pop up for a moment. Tap one before it ducks back down. Tapping an empty hole — or letting a mole escape — costs a miss. You get 30 seconds.</p>
+        <p class="hint">Desktop: keys 1–9 whack, P pauses, R restarts.</p>
+        <p class="record">Best <b id="sideBest">0</b></p>
+      </section>
+    </aside>
+  </main>
+
+  <p id="announce" class="sr-only" aria-live="polite"></p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // Keyboard play is desktop-only; phones use the touch controls.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
+  // Phones play by tapping the board, so hide the on-screen button pads.
+  if (phoneMode.matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches)) {
+    document.documentElement.classList.add("no-touch-pad");
+  }
+  const isPhone = document.documentElement.classList.contains("no-touch-pad");
+  // Controls tip is a dismissible bubble, not a persistent part of the layout.
+  const tip = document.getElementById("controlsTip");
+  if (tip) {
+    tip.querySelector(".tip-close").addEventListener("click", () => {
+      tip.classList.remove("is-open");
+    });
+    if (document.documentElement.classList.contains("no-touch-pad")) {
+      tip.classList.add("is-open");
+    }
+  }
+
+  const GRID = 3;
+  const ROUND = 30;
+  const KEY = "whackamole.best.v1";
+  const INK = "#20262b";
+  const SHADOW = "rgba(32,38,43,0.18)";
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const timeEl = document.getElementById("time");
+  const missesEl = document.getElementById("misses");
+  const bestEl = document.getElementById("best");
+  const sideBestEl = document.getElementById("sideBest");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const announceEl = document.getElementById("announce");
+
+  let W = 300, H = 300;
+  let score = 0, misses = 0, streak = 0, remaining = ROUND;
+  let best = loadBest(), phase = "idle", paused = false;
+  let mole = -1, lastMole = -1, moleAge = 0, moleLife = 0, spawnDelay = 0;
+  let effects = [];
+  let lastTime = performance.now();
+
+  function loadBest() {
+    try {
+      const v = Number(window.localStorage.getItem(KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (_) { return 0; }
+  }
+  function saveBest(v) {
+    try { window.localStorage.setItem(KEY, String(v)); } catch (_) {}
+  }
+  function announce(text) { announceEl.textContent = text; }
+  function updateStats() {
+    if (score > best) { best = score; saveBest(best); }
+    scoreEl.textContent = String(score);
+    timeEl.textContent = String(Math.ceil(remaining));
+    missesEl.textContent = String(misses);
+    bestEl.textContent = String(best);
+    sideBestEl.textContent = String(best);
+  }
+
+  function reset() {
+    score = 0; misses = 0; streak = 0; remaining = ROUND;
+    phase = "idle"; paused = false;
+    mole = -1; lastMole = -1; moleAge = 0; moleLife = 0; spawnDelay = 0;
+    effects = [];
+    pauseBtn.textContent = "Pause";
+    pauseBtn.setAttribute("aria-pressed", "false");
+    updateStats();
+    announce("New round. Tap a mole to start.");
+    canvas.focus({ preventScroll: true });
+    draw();
+  }
+
+  function togglePause() {
+    if (phase !== "playing" && !paused) return;
+    if (phase === "over") return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    pauseBtn.setAttribute("aria-pressed", String(paused));
+    announce(paused ? "Paused" : "Resumed");
+  }
+
+  function spawnMole() {
+    let next = Math.floor(Math.random() * GRID * GRID);
+    if (next === lastMole) next = (next + 1 + Math.floor(Math.random() * (GRID * GRID - 1))) % (GRID * GRID);
+    mole = next;
+    lastMole = next;
+    moleAge = 0;
+    moleLife = Math.max(560, 1350 - score * 5 + Math.random() * 260);
+  }
+
+  function addEffect(cell, text) {
+    effects.push({ cell: cell, text: text, age: 0 });
+  }
+
+  function whack(cell) {
+    if (phase !== "playing" || paused) return;
+    if (cell === mole) {
+      streak = Math.min(streak + 1, 5);
+      const gained = 10 + streak * 2;
+      score += gained;
+      addEffect(cell, "+" + gained);
+      mole = -1;
+      spawnDelay = 150 + Math.random() * 200;
+      announce("Hit! Score " + score);
+    } else {
+      streak = 0;
+      misses++;
+      addEffect(cell, "MISS");
+      announce("Miss. Misses " + misses);
+    }
+    updateStats();
+  }
+
+  function handleTap(cell) {
+    if (phase === "idle") {
+      phase = "playing";
+      announce("Round started. 30 seconds.");
+      return;
+    }
+    if (phase === "over") { reset(); phase = "playing"; announce("Round started. 30 seconds."); return; }
+    if (paused) return;
+    whack(cell);
+  }
+
+  function tick(dt) {
+    if (phase !== "playing" || paused) {
+      effects.forEach(f => { f.age += dt; });
+      effects = effects.filter(f => f.age < 600);
+      return;
+    }
+
+    remaining -= dt / 1000;
+    if (remaining <= 0) {
+      remaining = 0;
+      phase = "over";
+      mole = -1;
+      announce("Time's up. Score " + score + ". " + (isPhone ? "Tap to play again." : "Press R to play again."));
+    }
+
+    if (mole >= 0) {
+      moleAge += dt;
+      if (moleAge >= moleLife) {
+        misses++;
+        streak = 0;
+        addEffect(mole, "MISS");
+        mole = -1;
+        spawnDelay = 140 + Math.random() * 220;
+        updateStats();
+        announce("A mole got away. Misses " + misses);
+      }
+    } else if (phase === "playing") {
+      spawnDelay -= dt;
+      if (spawnDelay <= 0) spawnMole();
+    }
+
+    effects.forEach(f => { f.age += dt; });
+    effects = effects.filter(f => f.age < 600);
+    updateStats();
+  }
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    const dpr = window.devicePixelRatio || 1;
+    const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+    if (bw === canvas.width && bh === canvas.height && w === W && h === H) return;
+    W = w; H = h;
+    canvas.width = bw; canvas.height = bh;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    const rad = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rad);
+    ctx.arcTo(x + w, y + h, x, y + h, rad);
+    ctx.arcTo(x, y + h, x, y, rad);
+    ctx.arcTo(x, y, x + w, y, rad);
+    ctx.closePath();
+  }
+
+  function inkedShape(color, lineWidth) {
+    ctx.fillStyle = color;
+    ctx.shadowColor = SHADOW;
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 3;
+    ctx.fill();
+    ctx.shadowColor = "rgba(32,38,43,0)";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.lineWidth = lineWidth || 2;
+    ctx.strokeStyle = INK;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+  }
+
+  // A mole is a chunky brown shape with ears, eyes and a snout — all vector art.
+  function drawMole(cx, cy, r) {
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.72, -r * 0.48, r * 0.3, r * 0.34, -0.3, 0, Math.PI * 2);
+    inkedShape("#9a7557", 1.5);
+    ctx.beginPath();
+    ctx.ellipse(r * 0.72, -r * 0.48, r * 0.3, r * 0.34, 0.3, 0, Math.PI * 2);
+    inkedShape("#9a7557", 1.5);
+
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.08, r * 0.94, r * 1.06, 0, 0, Math.PI * 2);
+    inkedShape("#9a7557", 2);
+
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.5, r * 0.52, r * 0.54, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#e6cdb7";
+    ctx.fill();
+
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(side * r * 0.34, -r * 0.12, r * 0.13, 0, Math.PI * 2);
+      ctx.fillStyle = "#fffdfa";
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(side * r * 0.34 + side * r * 0.03, -r * 0.12, r * 0.055, 0, Math.PI * 2);
+      ctx.fillStyle = INK;
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.28, r * 0.2, r * 0.14, 0, 0, Math.PI * 2);
+    inkedShape("#e5724c", 1.5);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.09, r * 0.44);
+    ctx.lineTo(-r * 0.09, r * 0.62);
+    ctx.lineTo(r * 0.09, r * 0.62);
+    ctx.lineTo(r * 0.09, r * 0.44);
+    ctx.fillStyle = "#fffdfa";
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const cw = W / GRID, ch = H / GRID;
+
+    for (let i = 0; i < GRID * GRID; i++) {
+      const r = Math.floor(i / GRID), c = i % GRID;
+      const x = c * cw + cw / 2, y = r * ch + ch / 2;
+      const rx = cw * 0.34, ry = ch * 0.3;
+
+      ctx.beginPath();
+      ctx.ellipse(x, y + ry * 0.22, rx * 1.12, ry * 1.05, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(229,114,76,0.10)";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx * 1.06, ry, 0, 0, Math.PI * 2);
+      inkedShape("#ede7dc", 2);
+
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx * 0.82, ry * 0.78, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#20262b";
+      ctx.fill();
+
+      if (i === mole) {
+        const rise = Math.min(1, moleAge / 130, Math.max(0, (moleLife - moleAge) / 130));
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx * 0.82, ry * 0.78, 0, 0, Math.PI * 2);
+        ctx.clip();
+        const bodyR = Math.min(cw, ch) * 0.32;
+        drawMole(x, y + bodyR * 1.5 * (1 - rise) + ry * 0.16, bodyR);
+        ctx.restore();
+      }
+    }
+
+    effects.forEach(f => {
+      const r = Math.floor(f.cell / GRID), c = f.cell % GRID;
+      const x = c * cw + cw / 2, y = r * ch + ch / 2;
+      const a = Math.max(0, 1 - f.age / 600);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = f.text === "MISS" ? "#e5724c" : "#3f9b91";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, cw * (0.2 + 0.32 * (1 - a)), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = INK;
+      ctx.font = "700 " + Math.max(14, Math.round(cw * 0.16)) + "px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(f.text, x, y - cw * (0.2 + 0.2 * (1 - a)));
+      ctx.restore();
+    });
+
+    if (paused || phase === "idle" || phase === "over") {
+      ctx.fillStyle = "rgba(255,253,250,0.90)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      const title = phase === "over" ? "Time's up!" : paused ? "Paused" : "Ready?";
+      let hint;
+      if (phase === "over") hint = "Score " + score + " · Best " + best + " — " + (isPhone ? "tap to play again" : "press R or tap to play again");
+      else if (paused) hint = "Tap Pause to resume";
+      else hint = isPhone ? "Tap a mole to begin" : "Tap a mole or press 1–9 to begin";
+      ctx.fillStyle = INK;
+      ctx.font = "700 " + Math.max(17, Math.min(26, W * 0.065)) + "px monospace";
+      ctx.fillText(title, W / 2, H / 2 - 6);
+      ctx.font = Math.max(10, Math.min(13, W * 0.033)) + "px monospace";
+      ctx.fillStyle = "rgba(32,38,43,0.62)";
+      ctx.fillText(hint, W / 2, H / 2 + 20);
+    }
+  }
+
+  function loop(now) {
+    const dt = Math.min(now - lastTime, 100);
+    lastTime = now;
+    tick(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function cellAt(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return -1;
+    const c = Math.min(GRID - 1, Math.floor(x / (rect.width / GRID)));
+    const r = Math.min(GRID - 1, Math.floor(y / (rect.height / GRID)));
+    return r * GRID + c;
+  }
+
+  canvas.addEventListener("pointerdown", e => {
+    const cell = cellAt(e);
+    if (cell >= 0) handleTap(cell);
+  });
+
+  pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
+  document.getElementById("newBtn").addEventListener("click", reset);
+
+  window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
+    if (/^[1-9]$/.test(e.key)) {
+      e.preventDefault();
+      handleTap(Number(e.key) - 1);
+      return;
+    }
+    if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); return; }
+    if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); return; }
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (phase === "idle" || phase === "over") reset();
+      else togglePause();
+    }
+  });
+
+  best = loadBest();
+  lastTime = performance.now();
+  resize();
+  reset();
+  window.addEventListener("resize", resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+  requestAnimationFrame(loop);
+})();
+</script>
+
+<script>
+(() => {
+  const btn = document.getElementById("lights");
+  if (!btn) return;
+  const KEY = "arcade.theme.v1";
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    btn.setAttribute("aria-checked", String(theme === "light"));
+    try { localStorage.setItem(KEY, theme); } catch (_) {}
+  }
+  let saved = "dark";
+  try { saved = localStorage.getItem(KEY) || "dark"; } catch (_) {}
+  setTheme(saved === "light" ? "light" : "dark");
+  btn.addEventListener("click", () => {
+    setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>

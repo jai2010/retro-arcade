@@ -1,6 +1,6 @@
 # Offline Arcade
 
-Ten self-contained retro games. Each game is one HTML file with inline CSS and JavaScript.
+Nineteen self-contained retro games. Each game is one HTML file with inline CSS and JavaScript.
 
 ## Play
 
@@ -22,6 +22,15 @@ No internet connection is required.
 | 2048 | `2048/index.html` | Swipe, arrow keys, touch buttons |
 | Simon | `simon/index.html` | Tap pads, keys 1-4 |
 | Pac-Man | `pacman/index.html` | Swipe, arrow keys, touch buttons |
+| Sky Hop | `skyhop/index.html` | Tap to flap (keyboard on desktop) |
+| Whack-a-Mole | `whackamole/index.html` | Tap a mole |
+| Memory | `memory/index.html` | Tap cards to flip |
+| 15 Puzzle | `fifteen/index.html` | Tap a tile to slide it |
+| Minesweeper | `minesweeper/index.html` | Tap to reveal, long-press to flag |
+| Connect Four | `connect4/index.html` | Tap a column to drop a disc |
+| Sokoban | `sokoban/index.html` | Swipe or tap a neighbour to move |
+| Lunar Lander | `lunarlander/index.html` | Tap/hold to thrust, drag to steer |
+| Missile Command | `missilecommand/index.html` | Tap to intercept |
 
 ## Notes
 
@@ -37,6 +46,7 @@ No internet connection is required.
   header. The board is sized to the viewport in portrait and landscape. A short controls
   tooltip appears on phones and closes with its × button; it is shown again on the next
   visit. Keyboard controls and button pads still work on larger screens.
-- The home page uses `thumbs/*.png`, cropped from the supplied illustration grid.
-  They are local files; nothing is fetched over the network.
+- The home page uses local thumbnails in `img/`: PNGs cropped from the supplied
+  illustration grid for the original games, and matching SVG thumbnails for the
+  newer ones. Nothing is fetched over the network.
 - No external fonts, images, audio, libraries or network calls are used.

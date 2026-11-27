@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lunar Lander</title>
+<style>
+  :root { --paper:#f7f4ee; --ink:#20262b; --muted:rgba(32,38,43,.62); --accent:#e5724c; --accent-dark:#20262b; --teal:#3f9b91; --sand:#ede7dc; --line:#ede7dc; --surface:#fffdfa; --radius:12px; --radius-sm:8px; --retro-font:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background-color:var(--paper);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.05'/%3E%3C/svg%3E");color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;overflow:hidden}
+  .shell{--board-w:min(calc((100dvh - 178px) * 0.7600),342px);--side-w:270px;--gap:clamp(12px,2vw,24px);--content-w:calc(var(--board-w) + var(--gap) + var(--side-w));height:100dvh;max-width:1080px;margin:0 auto;padding:clamp(10px,1.8vh,22px) clamp(14px,2vw,30px) clamp(10px,1.6vh,18px);display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:clamp(8px,1.4vh,16px)}
+  header.top,.game{width:min(100%,var(--content-w));margin-inline:auto}
+  header.top{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+  h1{margin:0;font-size:clamp(24px,3.4vw,38px);letter-spacing:-.02em;line-height:1.15}
+  .tagline{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  button{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius-sm);box-shadow:0 2px 0 rgba(32,38,43,.18);padding:8px 14px;min-height:44px;cursor:pointer;transition:transform 120ms ease,box-shadow 120ms ease,border-color 120ms ease,background 120ms ease}
+  button:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(32,38,43,0.10);border-color:var(--teal)}
+  button:active{transform:translateY(1px);box-shadow:none}
+  button.primary{background:var(--accent);border-color:var(--ink);color:#fffdfa}
+  button.primary:hover{background:var(--accent-dark)}
+  .actions a.back{display:inline-flex;align-items:center;justify-content:center;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius-sm);box-shadow:0 2px 0 rgba(32,38,43,.18);padding:8px 14px;min-height:44px;text-decoration:none;transition:transform 120ms ease,box-shadow 120ms ease,border-color 120ms ease}
+  .actions a.back:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(32,38,43,0.10);border-color:var(--teal)}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .game{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,var(--board-w)) var(--side-w);gap:var(--gap);align-items:center}
+  .play{display:flex;flex-direction:column;gap:clamp(6px,1vh,10px);min-height:0;width:var(--board-w)}
+  .board-width{width:var(--board-w)}
+  .hud{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius)}
+  .score-block{display:flex;align-items:baseline;gap:8px}
+  .score-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+  #score{font-size:clamp(24px,3.2vh,36px);line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .chip{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--sand);border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .chip b{color:var(--ink);font-variant-numeric:tabular-nums} .chip.best b{color:var(--accent)} .chip.low b{color:var(--accent)}
+  .board-wrap{position:relative;aspect-ratio:342/450;background:var(--sand);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 10px 24px rgba(32,38,43,0.14);padding:8px}
+  canvas.board{display:block;width:100%;height:100%;border-radius:var(--radius-sm);background:#fffdfa;touch-action:none;}
+  .side{width:100%;display:flex;flex-direction:column;gap:clamp(8px,1.3vh,14px);max-height:calc(100dvh - 120px);overflow-y:auto;padding-right:2px}
+  .panel{background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 6px 16px rgba(32,38,43,0.10);padding:clamp(9px,1.3vh,14px)}
+  .panel h2{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .legend{font-size:12px} .legend div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+  kbd{font:inherit;font-size:11px;background:var(--sand);border:2px solid var(--ink);border-bottom-width:2px;border-radius:5px;padding:1px 5px;white-space:nowrap}
+  .help,.hint,.record{margin:0;color:var(--muted);font-size:12px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media(max-width:760px){body{overflow:auto}.shell{height:auto;min-height:100dvh}header.top,.game{width:100%}header.top{align-items:flex-start;flex-direction:column}.game{grid-template-columns:1fr;align-items:start}.play{width:100%}.board-width{width:min(100%,calc((100dvh - 220px) * 0.7600)) !important;margin-inline:auto}.play .hud{width:100%}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none;overflow:visible}.side .panel:last-child{grid-column:1/-1}}
+  @media(max-height:620px) and (min-width:761px){.tagline{display:none}h1{font-size:24px}.side{gap:6px}.panel{padding:8px}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0.01ms!important}}
+  /* Shared arcade header and retro typography */
+  body{font-family:var(--retro-font);font-size:13px}
+  header,header.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-direction:row!important;align-items:center!important;min-height:52px;padding-bottom:10px;border-bottom:2px solid var(--ink)}
+  header h1{font-family:var(--retro-font);font-size:24px;line-height:1;text-transform:uppercase;letter-spacing:.08em;margin:0}
+  header .tagline{margin:4px 0 0;font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44ch;text-transform:uppercase;letter-spacing:.05em}
+  header .actions{flex-wrap:nowrap}
+  .panel h2,.chip,.score-label,kbd,.keys,.name,.title,.desc{font-family:var(--retro-font);letter-spacing:.05em}
+  .panel h2,.chip,.score-label,.keys{text-transform:uppercase}
+  button,.actions a.back{font-family:var(--retro-font);text-transform:uppercase;letter-spacing:.05em;font-size:12px}
+  /* Arcade lighting: shared with the home page */
+  body[data-theme="dark"]{--paper:#171b1e;--ink:#f7f4ee;--muted:#aab2b7;--line:rgba(247,244,238,.22);--surface:#20262b;--sand:#2b3237}
+  body{background-color:var(--paper);background-image:radial-gradient(circle at 50% -10%,rgba(229,114,76,.10),transparent 60%),radial-gradient(rgba(128,128,128,.055) .7px,transparent .7px);background-size:auto,6px 6px;transition:background-color 200ms ease,color 200ms ease}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;background:repeating-linear-gradient(180deg,rgba(128,128,128,.035) 0 1px,transparent 1px 4px)}
+  .shell{position:relative;z-index:1}
+  .joystick{width:44px;height:44px;min-height:44px;padding:0;border-radius:50%;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;cursor:pointer;text-transform:none}
+  .joystick .stick{display:block;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid rgba(32,38,43,.65);transform:translateY(-5px);transition:transform 180ms ease}
+  .joystick[aria-checked="true"] .stick{transform:translateY(5px)} .joystick:hover{border-color:var(--accent)}
+  /* Phone-first play: no keyboard prompts and no button panels. */
+  @media(max-width:760px){header .tagline{display:none!important}header h1{font-size:18px!important}.actions{flex-wrap:nowrap!important;justify-content:flex-end!important;gap:4px!important}.actions button,.actions a.back{min-height:36px!important;padding:5px 7px!important;font-size:10px!important}.joystick{width:40px!important;height:40px!important;min-height:40px!important}.hud{padding:6px 10px!important;gap:6px!important}.chip{font-size:10px!important;padding:3px 7px!important}.legend,.help,.hint{display:none!important}.shell{padding-bottom:24px!important}}
+  /* Phone layout: fit the board to the viewport; draw the rest from the canvas. */
+  .gesture-tip{display:none}
+  html.no-touch-pad .shell{max-width:none!important;padding:8px 4px 14px!important}
+  html.no-touch-pad header,html.no-touch-pad .game{width:100%!important;max-width:none!important}
+  html.no-touch-pad .game{grid-template-columns:1fr!important;grid-template-rows:1fr!important;align-items:stretch!important}
+  html.no-touch-pad .play{width:100%!important;height:100%;justify-content:flex-start}
+  html.no-touch-pad .play .hud{width:100%!important}
+  html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 170px) * 0.7600))!important;margin-inline:auto!important}
+  html.no-touch-pad .side{display:none!important}
+  html.no-touch-pad .gesture-tip{display:none;position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;align-items:center;gap:12px;width:min(92vw,420px);max-width:min(92vw,420px);padding:9px 10px 9px 14px;border:1px solid rgba(128,128,128,.35);border-radius:14px;background:var(--surface,#fffdfa);box-shadow:0 8px 24px rgba(0,0,0,.25);color:var(--muted,currentColor);font:12px/1.35 var(--retro-font,monospace);text-align:center}
+  html.no-touch-pad .gesture-tip.is-open{display:flex}
+  .tip-close{flex:0 0 auto;width:30px;height:30px;padding:0;border:1px solid rgba(128,128,128,.35);border-radius:50%;background:transparent;color:inherit;font:18px/1 monospace;cursor:pointer}
+  @media(max-height:520px) and (pointer:coarse){html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 140px) * 0.7600))!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div>
+      <h1>Lunar Lander</h1>
+      <p class="tagline">Thrust gently. Touch down level, on the pad.</p>
+    </div>
+    <div class="actions">
+      <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights"><span class="stick" aria-hidden="true"></span></button>
+      <a class="back" href="../index.html" aria-label="Back to arcade">← Arcade</a>
+      <button id="pauseBtn" type="button" aria-pressed="false">Pause</button>
+      <button id="newBtn" class="primary" type="button">New game</button>
+    </div>
+  </header>
+
+  <main class="game">
+    <section class="play" aria-label="Game">
+      <div class="hud board-width" aria-live="polite">
+        <div class="score-block"><span class="score-label">Score</span><strong id="score">0</strong></div>
+        <div class="chips">
+          <span class="chip" id="fuelChip">Fuel <b id="fuel">100%</b></span>
+          <span class="chip best">Best <b id="best">0</b></span>
+        </div>
+      </div>
+
+      <div class="board-wrap board-width">
+        <canvas id="game" class="board" tabindex="0" role="img" aria-label="Lunar Lander playfield: steer and thrust the lander onto the flat pad">Your browser does not support canvas.</canvas>
+      </div>
+      <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
+        <span>Drag up to thrust · Drag sideways to steer</span>
+        <button type="button" class="tip-close" aria-label="Close controls tip">×</button>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Instructions">
+      <section class="panel">
+        <h2>Safe landing</h2>
+        <p class="help">Both feet must be on the flat pad, the lander close to level, and the descent slow. Touch down anywhere else — or too fast — and it's a crash.</p>
+      </section>
+      <section class="panel">
+        <h2>Fuel &amp; score</h2>
+        <p class="hint">Thrust burns fuel. The score rewards a centred touchdown and the fuel you have left. On a phone, drag up to thrust and left or right to steer.</p>
+      </section>
+    </aside>
+  </main>
+
+  <p id="announce" class="sr-only" aria-live="polite"></p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  // Keyboard play is desktop-only; phones use drag gestures on the board.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+  // Phones play by gestures on the board, so there are no on-screen buttons.
+  if (phoneMode.matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches)) {
+    document.documentElement.classList.add("no-touch-pad");
+  }
+  const tip = document.getElementById("controlsTip");
+  if (tip) {
+    tip.querySelector(".tip-close").addEventListener("click", () => tip.classList.remove("is-open"));
+    if (document.documentElement.classList.contains("no-touch-pad")) tip.classList.add("is-open");
+  }
+  const W = 342;
+  const H = 450;
+  const GRAVITY = 62;
+  const THRUST = 128;
+  const BURN = 16;
+  const KEY = "lunarlander.best.v1";
+  const INK = "#20262b";
+  const SHADOW = "rgba(32,38,43,0.18)";
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const fuelEl = document.getElementById("fuel");
+  const fuelChip = document.getElementById("fuelChip");
+  const bestEl = document.getElementById("best");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const announceEl = document.getElementById("announce");
+  const touchPhone = () => document.documentElement.classList.contains("no-touch-pad");
+  let lander, terrain, padX, padW, padY, particles, score, best, bestAnnounced;
+  let started, paused, gameOver, landed, showScore, keys, pointer, lastTime;
+  // localStorage can be blocked for file:// pages; keep the best in memory then.
+  function loadBest() {
+    try {
+      const v = Number(window.localStorage.getItem(KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (_) { return 0; }
+  }
+  function saveBest(v) {
+    try { window.localStorage.setItem(KEY, String(v)); } catch (_) {}
+  }
+  // Resizing the backing store clears it; the next animation frame redraws.
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function makeTerrain() {
+    padW = 64;
+    padX = 106 + Math.random() * 86;
+    padY = 368 + Math.random() * 26;
+    const xs = [0];
+    for (let x = 34; x < W; x += 34) xs.push(x);
+    xs.push(W);
+    terrain = xs.filter(x => x < padX - 9 || x > padX + padW + 9)
+                .map(x => ({ x, y: 326 + Math.random() * 96 }));
+    terrain.push({ x: padX, y: padY }, { x: padX + padW, y: padY });
+    terrain.sort((a, b) => a.x - b.x);
+  }
+  function terrainHeight(x) {
+    const px = Math.max(0, Math.min(W, x));
+    for (let i = 1; i < terrain.length; i++) {
+      if (px <= terrain[i].x) {
+        const a = terrain[i - 1], b = terrain[i];
+        const t = (px - a.x) / (b.x - a.x || 1);
+        return a.y + (b.y - a.y) * t;
+      }
+    }
+    return terrain[terrain.length - 1].y;
+  }
+  function reset() {
+    makeTerrain();
+    lander = { x: W / 2, y: 58, vx: 20, vy: 0, angle: 0, fuel: 100, thrusting: false };
+    particles = [];
+    score = 0;
+    showScore = 0;
+    bestAnnounced = false;
+    started = false;
+    paused = false;
+    gameOver = false;
+    landed = false;
+    keys = { thrust: false, left: false, right: false };
+    pointer = { down: false, x: 0, y: 0, startX: 0, startY: 0, tilt: 0, power: 0 };
+    pauseBtn.textContent = "Pause";
+    pauseBtn.setAttribute("aria-pressed", "false");
+    updateStats();
+    announce("New game");
+    canvas.focus({ preventScroll: true });
+  }
+  function updateStats() {
+    if (score > best) {
+      best = score;
+      saveBest(best);
+      if (!bestAnnounced) { bestAnnounced = true; announce("New best score"); }
+    }
+    scoreEl.textContent = String(score);
+    const f = Math.round(lander.fuel);
+    fuelEl.textContent = f + "%";
+    fuelChip.classList.toggle("low", f <= 20);
+    bestEl.textContent = String(best);
+  }
+  function announce(text) { announceEl.textContent = text; }
+  function togglePause() {
+    if (gameOver || landed || !started) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    pauseBtn.setAttribute("aria-pressed", String(paused));
+    announce(paused ? "Paused" : "Resumed");
+  }
+  function feet() {
+    const c = Math.cos(lander.angle), s = Math.sin(lander.angle);
+    return [
+      { x: lander.x + (-11 * c - 11 * s), y: lander.y + (-11 * s + 11 * c) },
+      { x: lander.x + (11 * c - 11 * s), y: lander.y + (11 * s + 11 * c) }
+    ];
+  }
+  function puff(x, y, count, color) {
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 70,
+        vy: (Math.random() - 0.5) * 70,
+        life: 0.5 + Math.random() * 0.5,
+        size: 1.5 + Math.random() * 3,
+        color
+      });
+    }
+    if (particles.length > 180) particles.splice(0, particles.length - 180);
+  }
+  function update(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 60 * dt;
+      p.life -= dt * 1.6;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+    if (!started || paused || gameOver || landed) return;
+    const hasFuel = lander.fuel > 0;
+    const power = keys.thrust ? 1 : (pointer.down ? pointer.power : 0);
+    lander.thrusting = hasFuel && power > 0.05;
+    if (keys.left) lander.angle -= 1.7 * dt;
+    if (keys.right) lander.angle += 1.7 * dt;
+    if (!keys.left && !keys.right && pointer.down) {
+      lander.angle += (pointer.tilt - lander.angle) * Math.min(1, dt * 7);
+    }
+    lander.angle = Math.max(-1.1, Math.min(1.1, lander.angle));
+    let ax = 0, ay = GRAVITY;
+    if (lander.thrusting) {
+      ax += -Math.sin(lander.angle) * THRUST * power;
+      ay += -Math.cos(lander.angle) * THRUST * power;
+      lander.fuel = Math.max(0, lander.fuel - BURN * dt * power);
+      fuelEl.textContent = Math.round(lander.fuel) + "%";
+      fuelChip.classList.toggle("low", lander.fuel <= 20);
+      if (Math.random() < 0.7) {
+        puff(lander.x + Math.sin(lander.angle) * 12, lander.y + Math.cos(lander.angle) * 12, 1, "#e5724c");
+      }
+    }
+    lander.vx += ax * dt;
+    lander.vy += ay * dt;
+    lander.x += lander.vx * dt;
+    lander.y += lander.vy * dt;
+    if (lander.x < 13) { lander.x = 13; lander.vx *= -0.35; }
+    if (lander.x > W - 13) { lander.x = W - 13; lander.vx *= -0.35; }
+    if (lander.y < 14) { lander.y = 14; lander.vy = Math.max(0, lander.vy); }
+    // Touchdown is decided by the two feet reaching the surface.
+    const f = feet();
+    let contact = null;
+    for (const foot of f) {
+      if (foot.y >= terrainHeight(foot.x)) { contact = foot; break; }
+    }
+    if (contact) {
+      const onPad = f.every(foot => foot.x >= padX && foot.x <= padX + padW);
+      const soft = Math.abs(lander.vy) < 40 && Math.abs(lander.vx) < 24 && Math.abs(lander.angle) < 0.2;
+      lander.y = contact.y - 11;
+      if (onPad && soft) {
+        const accuracy = 1 - Math.min(1, Math.abs(lander.x - (padX + padW / 2)) / (padW / 2));
+        score = Math.round(200 + lander.fuel * 2 + accuracy * 120 + (1 - Math.abs(lander.vy) / 40) * 60);
+        landed = true;
+        lander.vx = 0; lander.vy = 0;
+        puff(lander.x, contact.y, 18, "#3f9b91");
+        announce("Landed! Score " + score);
+      } else {
+        gameOver = true;
+        lander.thrusting = false;
+        puff(lander.x, contact.y, 26, "#e5724c");
+        announce("Crashed. Score " + score);
+      }
+      updateStats();
+    }
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function drawLander() {
+    ctx.save(); ctx.translate(lander.x, lander.y);
+    ctx.rotate(lander.angle);
+    // Engine flame, behind everything else.
+    if (lander.thrusting) {
+      const flick = 9 + Math.random() * 7;
+      ctx.beginPath(); ctx.moveTo(-5, 9);
+      ctx.lineTo(0, 9 + flick); ctx.lineTo(5, 9);
+      ctx.closePath(); ctx.fillStyle = "#e5724c";
+      ctx.fill(); ctx.beginPath();
+      ctx.moveTo(-2.5, 9); ctx.lineTo(0, 9 + flick * 0.6);
+      ctx.lineTo(2.5, 9); ctx.closePath();
+      ctx.fillStyle = "#e6b34d"; ctx.fill();
+    }
+    // Legs and pads.
+    ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-7, 5); ctx.lineTo(-11, 11); ctx.lineTo(-15, 11);
+    ctx.moveTo(7, 5); ctx.lineTo(11, 11); ctx.lineTo(15, 11); ctx.stroke();
+    // Gold-foil body with an ink outline and a teal window.
+    ctx.beginPath(); ctx.moveTo(0, -12);
+    ctx.lineTo(8, -3); ctx.lineTo(7, 7);
+    ctx.lineTo(-7, 7); ctx.lineTo(-8, -3);
+    ctx.closePath(); ctx.fillStyle = "#fffdfa";
+    ctx.fill(); ctx.shadowColor = SHADOW; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+    ctx.fill(); ctx.shadowColor = "rgba(32,38,43,0)"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.stroke(); ctx.fillStyle = "#e6b34d";
+    ctx.fillRect(-7, 3, 14, 3); ctx.beginPath();
+    ctx.arc(0, -3, 3.2, 0, Math.PI * 2); ctx.fillStyle = "#3f9b91";
+    ctx.fill(); ctx.lineWidth = 1.5;
+    ctx.stroke(); ctx.beginPath();
+    ctx.moveTo(-4, -9); ctx.lineTo(4, -9);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawFuelGauge() {
+    const x = 12, y = H - 72, w = 92, h = 28;
+    roundRect(x, y, w, h, 7);
+    ctx.fillStyle = "rgba(255,253,250,0.88)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.fillStyle = "rgba(32,38,43,0.62)";
+    ctx.font = "9px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText("FUEL", x + 7, y + 12);
+    ctx.fillStyle = "rgba(32,38,43,0.10)";
+    roundRect(x + 7, y + 16, w - 14, 6, 3);
+    ctx.fill();
+    ctx.fillStyle = lander.fuel <= 20 ? "#e5724c" : "#3f9b91";
+    roundRect(x + 7, y + 16, Math.max(1, (w - 14) * lander.fuel / 100), 6, 3);
+    ctx.fill();
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#fffdfa");
+    sky.addColorStop(1, "#ece5da");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+    // Star field and a crescent moon, all vector marks on the single canvas.
+    ctx.fillStyle = "rgba(32,38,43,0.28)";
+    for (let i = 0; i < 34; i++) {
+      const sx = (i * 97 + 43) % W;
+      const sy = (i * 61 + 19) % 230;
+      ctx.fillRect(sx, sy, i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1);
+    }
+    ctx.beginPath();
+    ctx.arc(276, 68, 19, 0, Math.PI * 2);
+    ctx.fillStyle = "#e6b34d";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(283, 62, 17, 0, Math.PI * 2);
+    ctx.fillStyle = "#fffdfa";
+    ctx.fill();
+    // Distant ridge, then the solid ground with a crater or two.
+    ctx.beginPath();
+    ctx.moveTo(0, 330);
+    ctx.lineTo(56, 300); ctx.lineTo(112, 326); ctx.lineTo(186, 292);
+    ctx.lineTo(258, 322); ctx.lineTo(W, 300); ctx.lineTo(W, H); ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(63,155,145,0.10)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0, terrain[0].y);
+    for (const p of terrain) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(W, H); ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fillStyle = "#ede7dc";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, terrain[0].y);
+    for (const p of terrain) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(32,38,43,0.18)";
+    ctx.lineWidth = 1;
+    for (const cx of [42, 92, 252, 308]) {
+      const cy = terrainHeight(cx) + 18;
+      if (cy < H - 6) {
+        ctx.beginPath(); ctx.ellipse(cx, cy, 11, 4, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    // Landing pad: teal strip, corner lights and chevrons.
+    ctx.fillStyle = "#3f9b91";
+    ctx.fillRect(padX, padY, padW, 4);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(padX, padY, padW, 4);
+    for (const lx of [padX + 4, padX + padW - 4]) {
+      ctx.beginPath(); ctx.arc(lx, padY - 3, 2.6, 0, Math.PI * 2);
+      ctx.fillStyle = "#e5724c"; ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(63,155,145,0.55)";
+    ctx.font = "10px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("LZ", padX + padW / 2, padY - 12);
+    // Faint velocity cue while flying.
+    if (started && !paused && !gameOver && !landed) {
+      ctx.strokeStyle = "rgba(32,38,43,0.16)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      ctx.beginPath();
+      ctx.moveTo(lander.x, lander.y);
+      ctx.lineTo(lander.x + lander.vx * 0.5, lander.y + lander.vy * 0.5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    drawLander();
+    drawFuelGauge();
+    if (started && !paused && !gameOver && !landed) {
+      ctx.fillStyle = "rgba(255,253,250,0.78)";
+      roundRect(70, 14, W - 140, 22, 7);
+      ctx.fill();
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "rgba(32,38,43,0.62)";
+      ctx.textAlign = "center";
+      ctx.fillText(touchPhone() ? "DRAG UP: THRUST   ·   DRAG SIDEWAYS: STEER" : "↑: THRUST   ·   ← →: TILT", W / 2, 29);
+    }
+    if (paused || gameOver || landed || !started) {
+      ctx.fillStyle = "rgba(255,253,250,0.88)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = INK;
+      ctx.font = "700 25px monospace";
+      ctx.textAlign = "center";
+      const title = gameOver ? "Crashed" : landed ? "Landed!" : paused ? "Paused" : "Ready?";
+      ctx.fillText(title, W / 2, H / 2 - 20);
+      ctx.font = "12px monospace";
+      ctx.fillStyle = "rgba(32,38,43,0.62)";
+      let hint;
+      if (gameOver) hint = touchPhone() ? "Tap the board to try again" : "Press R to try again";
+      else if (landed) hint = touchPhone() ? "Tap the board to fly again" : "Press R to fly again";
+      else if (paused) hint = touchPhone() ? "Tap Pause to resume" : "Press P to resume";
+      else hint = touchPhone() ? "Drag up to thrust · sideways to steer" : "Press ↑ to thrust · ← → to tilt";
+      ctx.fillText(hint, W / 2, H / 2 + 8);
+      if (landed || gameOver) {
+        ctx.fillStyle = landed ? "#3f9b91" : "#e5724c";
+        ctx.font = "700 15px monospace";
+        ctx.fillText((landed ? "Score " : "Fuel left ") + (landed ? score : Math.round(lander.fuel) + "%"), W / 2, H / 2 + 36);
+      }
+    }
+  }
+  function loop(now) {
+    const dt = Math.max(0, Math.min(now - lastTime, 100)) / 1000;
+    lastTime = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
+  document.getElementById("newBtn").addEventListener("click", reset);
+  window.addEventListener("resize", resize);
+  window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
+    if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
+      e.preventDefault(); keys.thrust = true; started = true; return;
+    }
+    if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+      e.preventDefault(); keys.left = true; started = true; return;
+    }
+    if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+      e.preventDefault(); keys.right = true; started = true; return;
+    }
+    if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); return; }
+    if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); }
+  });
+  window.addEventListener("keyup", e => {
+    if (phoneMode.matches) return;
+    if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") keys.thrust = false;
+    if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") keys.left = false;
+    if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") keys.right = false;
+  });
+  function pointerPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+  canvas.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    const p = pointerPos(e);
+    pointer.down = true;
+    pointer.startX = p.x; pointer.startY = p.y;
+    pointer.x = p.x; pointer.y = p.y;
+    pointer.tilt = lander.angle;
+    pointer.power = 0;
+    if (gameOver || landed) { reset(); }
+    started = true;
+    canvas.focus({ preventScroll: true });
+  });
+  canvas.addEventListener("pointermove", e => {
+    if (!pointer.down) return;
+    e.preventDefault();
+    const p = pointerPos(e);
+    pointer.x = p.x; pointer.y = p.y;
+    pointer.tilt = Math.max(-0.7, Math.min(0.7, (p.x - pointer.startX) / 80));
+    pointer.power = Math.max(0, Math.min(1, (pointer.startY - p.y) / 70));
+  });
+  function endPointer() { pointer.down = false; pointer.power = 0; }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+  canvas.addEventListener("pointerleave", endPointer);
+  best = loadBest();
+  resize();
+  reset();
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+<script>
+(() => {
+  const btn = document.getElementById("lights");
+  if (!btn) return;
+  const KEY = "arcade.theme.v1";
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    btn.setAttribute("aria-checked", String(theme === "light"));
+    try { localStorage.setItem(KEY, theme); } catch (_) {}
+  }
+  let saved = "dark";
+  try { saved = localStorage.getItem(KEY) || "dark"; } catch (_) {}
+  setTheme(saved === "light" ? "light" : "dark");
+  btn.addEventListener("click", () => {
+    setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>
