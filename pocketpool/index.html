@@ -177,15 +177,16 @@
   const R = 10.5;
   const POCKET_R = 16;
   const STEP = 1 / 120;
-  const FRICTION = 235;
-  const CUSHION_E = 0.82;
-  const BALL_E = 0.96;
+  const FRICTION = 45;          // gentle constant rolling resistance
+  const DRAG = 0.25;            // light speed-proportional drag -> natural long roll
+  const CUSHION_E = 0.74;       // softer cushion rebound
+  const BALL_E = 0.88;          // softer ball-to-ball impact
   const MAX_SPEED = 760;
   const MIN_SPEED = 110;
   const MAX_DRAG = 120;
   const SPIN_CURVE = 0.38;
   const SPIN_THROW = 95;
-  const STOP_EPS = 5;
+  const STOP_EPS = 3;
   const KEY = "pocketpool.best.v1";
   // Illustration palette, shared with the arcade thumbnails.
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
@@ -403,6 +404,9 @@
     b.vy += ty * english * SPIN_THROW;
     b.spin += a.spin * 0.45;
     a.spin *= 0.55;
+    const impact = Math.min(1, Math.abs(rel) / 320);
+    a.bump = Math.max(a.bump || 0, impact);
+    b.bump = Math.max(b.bump || 0, impact);
   }
 
   function update(dt) {
@@ -422,13 +426,15 @@
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
-      // Rolling friction brings the ball to a full stop.
+      // Rolling friction + drag: a long, gradually slowing roll, not a hard stop.
       const sp = Math.hypot(b.vx, b.vy);
       if (sp > 0) {
-        const ns = Math.max(0, sp - FRICTION * dt);
+        b.roll = (b.roll || 0) + sp / R * dt;
+        const ns = Math.max(0, sp - (FRICTION + sp * DRAG) * dt);
         if (ns < STOP_EPS) { b.vx = 0; b.vy = 0; b.spin = 0; }
         else { const k = ns / sp; b.vx *= k; b.vy *= k; }
       }
+      if (b.bump) b.bump = Math.max(0, b.bump - dt * 5);
 
       let captured = false;
       for (const p of POCKETS) {
@@ -569,20 +575,23 @@
 
   // Numbered solids and stripes with flat highlights and heavy ink edges.
   function drawBall(b) {
+    const squash = b.bump || 0;
     ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.scale(1 + squash * 0.09, 1 - squash * 0.11);
     ctx.beginPath();
-    ctx.arc(b.x, b.y, R, 0, Math.PI * 2);
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
     ctx.fillStyle = b.cue ? CREAM : (b.stripe ? CREAM : b.color);
     ctx.fill();
     ctx.save();
     ctx.clip();
     if (b.stripe) {
       ctx.fillStyle = b.color;
-      ctx.fillRect(b.x - R, b.y - R * 0.45, R * 2, R * 0.9);
+      ctx.fillRect(-R, -R * 0.45, R * 2, R * 0.9);
     }
     ctx.restore();
     ctx.beginPath();
-    ctx.arc(b.x, b.y, R, 0, Math.PI * 2);
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
     ctx.lineWidth = 2.5;
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
@@ -590,18 +599,25 @@
 
     // A short rim arc reads as a shine without turning the ball into a face.
     ctx.beginPath();
-    ctx.arc(b.x, b.y, R - 2.6, Math.PI * 1.06, Math.PI * 1.5);
+    ctx.arc(0, 0, R - 2.6, Math.PI * 1.06, Math.PI * 1.5);
     ctx.strokeStyle = b.cue ? PAPER : CREAM;
     ctx.lineWidth = 1.6;
     ctx.lineCap = "round";
     ctx.stroke();
+
+    // A small pearl dot rotates with the roll so motion is visible.
+    const roll = b.roll || 0;
+    ctx.beginPath();
+    ctx.arc(Math.cos(roll) * R * 0.55, Math.sin(roll) * R * 0.55, 2, 0, Math.PI * 2);
+    ctx.fillStyle = b.cue ? TINTS[CREAM] : CREAM;
+    ctx.fill();
 
     if (!b.cue) {
       ctx.fillStyle = b.stripe ? INK : CREAM;
       ctx.font = "800 10px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(String(b.num), b.x, b.y + 0.5);
+      ctx.fillText(String(b.num), 0, 0.5);
     }
     ctx.restore();
   }
