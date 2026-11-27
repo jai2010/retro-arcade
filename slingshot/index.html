@@ -135,8 +135,8 @@
         <p class="help">Pull the bird back and let go. Topple every block on the platform with three birds. Your score counts the blocks you knock down, plus a bonus for birds you have left.</p>
       </section>
       <section class="panel">
-        <h2>Touch</h2>
-        <p class="hint">Drag left and down to aim up and right, then release. The blocks have weight, spin and friction — hit them low to send the stack flying.</p>
+        <h2>Controls</h2>
+        <p class="hint">Drag the bird back and release to fire. On a desktop, use Up/Down to set the angle, Left/Right for power and Space to launch. Hit the stack low to topple it.</p>
       </section>
     </aside>
   </main>
@@ -198,6 +198,7 @@
 
   let bird, blocks, statics, pops;
   let dragging, dragPt, pointerId;
+  let aimAngle = -0.55, aimPower = 0.72;
   let birdsLeft, knocked, score, best, bestAnnounced;
   let started, paused, gameOver, won, shotTime;
   let acc, lastTime;
@@ -928,6 +929,16 @@
 
   // ---- Input --------------------------------------------------------------
 
+  // Desktop aiming: arrows set angle and pull, Space fires.
+  function applyAim() {
+    if (!bird || bird.active) return;
+    const pull = MAX_PULL * aimPower;
+    bird.x = clamp(REST.x - Math.cos(aimAngle) * pull, REST.x - 60, REST.x + 8);
+    bird.y = clamp(REST.y - Math.sin(aimAngle) * pull, 150, GROUND - BIRD_R - 6);
+    bird.a = clamp((REST.y - bird.y) * 0.004, -0.5, 0.3);
+    dragPt = { x: bird.x, y: bird.y };
+  }
+
   function pointerPos(e) {
     const r = canvas.getBoundingClientRect();
     return {
@@ -992,7 +1003,23 @@
   window.addEventListener("keydown", e => {
     if (phoneMode.matches) return;
     if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); return; }
-    if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); }
+    if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); return; }
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      aimAngle = clamp(aimAngle + (e.key === "ArrowUp" ? -0.05 : 0.05), -1.2, 0.15);
+      applyAim(); return;
+    }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      aimPower = clamp(aimPower + (e.key === "ArrowRight" ? 0.05 : -0.05), 0.15, 1);
+      applyAim(); return;
+    }
+    if (e.key === " ") {
+      e.preventDefault();
+      if (!bird || bird.active || paused || gameOver) return;
+      applyAim();
+      launch();
+    }
   });
 
   best = loadBest();
