@@ -372,6 +372,35 @@
   html.no-touch-pad .side .panel:has(.pad),
   html.no-touch-pad .side .panel:has(.pads) { display: none !important; }
   html.no-touch-pad .shell { padding-bottom: 24px !important; }
+
+  /* Phone layout: fit the board to the viewport, centre play, fill the rest with a cue. */
+  .gesture-tip { display: none; }
+  html.no-touch-pad .shell { max-width: none !important; padding: 8px 8px 14px !important; }
+  html.no-touch-pad header,
+  html.no-touch-pad .game { width: 100% !important; max-width: none !important; }
+  html.no-touch-pad .game { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; align-items: stretch !important; }
+  html.no-touch-pad .play { width: 100% !important; height: 100%; justify-content: flex-start; }
+  html.no-touch-pad .play .hud { width: 100% !important; }
+  html.no-touch-pad .board-wrap,
+  html.no-touch-pad .board-width { width: min(100%, calc((100dvh - 170px) * 1.0000)) !important; margin-inline: auto !important; }
+  html.no-touch-pad .side { display: none !important; }
+  html.no-touch-pad .gesture-tip {
+    display: block;
+    margin: auto auto 0;
+    max-width: 420px;
+    padding: 8px 14px;
+    border: 1px solid rgba(128,128,128,.35);
+    border-radius: 999px;
+    color: var(--muted, currentColor);
+    font: 11px/1.4 var(--retro-font, monospace);
+    text-align: center;
+  }
+
+  @media (max-height: 520px) and (pointer: coarse) {
+    html.no-touch-pad .board-wrap,
+    html.no-touch-pad .board-width { width: min(100%, calc((100dvh - 190px) * 1.0000)) !important; }
+    html.no-touch-pad .gesture-tip { margin-top: 6px !important; padding: 5px 12px !important; font-size: 10px !important; }
+  }
 </style>
 </head>
 <body>
@@ -401,6 +430,7 @@
       <div class="board-wrap">
         <canvas id="game" tabindex="0" role="img" aria-label="2048 playfield, 4 by 4 grid">Your browser does not support canvas.</canvas>
       </div>
+        <p class="gesture-tip">Swipe to slide the tiles</p>
     </section>
 
     <aside class="side" aria-label="Instructions and touch controls">

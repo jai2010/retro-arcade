@@ -510,13 +510,52 @@
     }
   }
   /* Phone board sizing */
-  @media (max-width: 760px) { .board-wrap { width: min(100%, calc((100dvh - 360px) * 0.5000)) !important; margin-inline: auto; } }
+  @media (max-width: 760px) { .board-wrap { width: min(100%, calc((100dvh - 420px) * 0.5000)) !important; margin-inline: auto; } }
   /* Phones play by tapping the board; hide the on-screen button pads. */
   html.no-touch-pad .side .panel.touch,
   html.no-touch-pad .side .panel:has(.touch),
   html.no-touch-pad .side .panel:has(.pad),
   html.no-touch-pad .side .panel:has(.pads) { display: none !important; }
   html.no-touch-pad .shell { padding-bottom: 24px !important; }
+
+  /* Phone layout: fit the board to the viewport, centre play, fill the rest with a cue. */
+  .gesture-tip { display: none; }
+  html.no-touch-pad .shell { max-width: none !important; padding: 8px 8px 14px !important; }
+  html.no-touch-pad header,
+  html.no-touch-pad .game { width: 100% !important; max-width: none !important; }
+  html.no-touch-pad .game { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; align-items: stretch !important; }
+  html.no-touch-pad .play { width: 100% !important; height: 100%; justify-content: flex-start; }
+  html.no-touch-pad .play .hud { width: 100% !important; }
+  html.no-touch-pad .board-wrap,
+  html.no-touch-pad .board-width { width: min(100%, calc((100dvh - 420px) * 0.5000)) !important; margin-inline: auto !important; }
+  html.no-touch-pad .side { display: none !important; }
+  html.no-touch-pad .gesture-tip {
+    display: block;
+    margin: auto auto 0;
+    max-width: 420px;
+    padding: 8px 14px;
+    border: 1px solid rgba(128,128,128,.35);
+    border-radius: 999px;
+    color: var(--muted, currentColor);
+    font: 11px/1.4 var(--retro-font, monospace);
+    text-align: center;
+  }
+
+  html.no-touch-pad .side { display: flex !important; flex-direction: row; gap: 8px; }
+  html.no-touch-pad .side .panel { flex: 1 1 0; min-width: 0; padding: 8px; }
+  html.no-touch-pad .side .panel h2 { margin-bottom: 4px; }
+  html.no-touch-pad .next-list { flex-direction: row; gap: 4px; }
+  html.no-touch-pad canvas.preview { max-width: 48px; }
+  @media (max-height: 520px) and (pointer: coarse) {
+    html.no-touch-pad .board-width { width: min(100%, calc((100dvh - 150px) * 0.5)) !important; }
+    html.no-touch-pad .side { display: none !important; }
+  }
+
+  @media (max-height: 520px) and (pointer: coarse) {
+    html.no-touch-pad .board-wrap,
+    html.no-touch-pad .board-width { width: min(100%, calc((100dvh - 190px) * 0.5000)) !important; }
+    html.no-touch-pad .gesture-tip { margin-top: 6px !important; padding: 5px 12px !important; font-size: 10px !important; }
+  }
 </style>
 </head>
 <body>
@@ -551,6 +590,7 @@
       <div class="board-wrap board-width enter" id="boardWrap">
         <canvas id="board" class="board" tabindex="0" role="img" aria-label="Tetris playfield, 10 columns by 20 rows">Your browser does not support canvas.</canvas>
       </div>
+        <p class="gesture-tip">Swipe sideways to move · Tap to rotate · Swipe down to drop</p>
     </section>
 
     <aside class="side" aria-label="Game information and touch controls">
