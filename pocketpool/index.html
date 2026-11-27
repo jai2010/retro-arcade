@@ -709,7 +709,7 @@
         ? "Score " + score + " · " + shots + " shots · New game"
         : paused
           ? "Tap Pause to resume"
-          : "Drag back, then release to shoot";
+          : "Tap anywhere to start · then drag back and release to shoot";
       ctx.fillText(hint, W / 2, H / 2 + 18);
       if (won || started) {
         ctx.fillStyle = INK;
@@ -754,6 +754,7 @@
     e.preventDefault();
     canvas.focus({ preventScroll: true });
     if (paused || won || moving() || cueBall.potted) return;
+    if (!started) { started = true; announce("Table ready"); }
     const p = local(e);
     if (Math.hypot(p.x - cueBall.x, p.y - cueBall.y) > R + 16) return;
     aiming = true;
