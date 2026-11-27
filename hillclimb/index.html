@@ -889,22 +889,8 @@
   window.addEventListener("blur", () => { keyThrottle = 0; pointerThrottle = 0; pointerActive = false; pointerId = null; });
 
   best = loadBest();
-  car = newCar();
-  cameraX = car.x - 110;
-  drift = 0;
-  score = 0;
-  maxX = car.x;
-  flips = 0;
-  stuck = false;
-  acc = 0;
-  started = false;
-  paused = false;
-  keyThrottle = 0;
-  pointerThrottle = 0;
-  pointerActive = false;
-  pointerId = null;
   resize();
-  updateStats();
+  reset();
   lastTime = performance.now();
   requestAnimationFrame(loop);
 })();
