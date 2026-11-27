@@ -688,8 +688,9 @@
     surface: CREAM,
     paper: PAPER
   };
-  // Rock classes get both a palette colour and a dot count, never colour alone.
-  const ROCK_COLORS = { 1: CORAL, 2: GOLD, 3: TEAL };
+  // The thumbnail's rocks are all grey-teal; crater count tells the classes
+  // apart rather than colour alone.
+  const ROCK_COLORS = { 1: TEAL, 2: TEAL, 3: TEAL };
 
   const canvas = document.getElementById("board");
   const ctx = canvas.getContext("2d");
@@ -1069,24 +1070,46 @@
     ctx.restore();
   }
 
-  // Midpoint curves soften the rock corners without changing the silhouette much.
-  function softRockPath(verts, radius) {
-    const pts = verts.map(v => ({
-      x: Math.cos(v.a) * radius * v.r,
-      y: Math.sin(v.a) * radius * v.r
-    }));
-    const n = pts.length;
-    const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  // Sharp, irregular edges: the thumbnail rocks are jagged slabs, not circles.
+  // The physics radius is untouched; only this outline changes.
+  function rockPath(verts, radius) {
     const path = new Path2D();
-    const start = mid(pts[n - 1], pts[0]);
-    path.moveTo(start.x, start.y);
-    for (let i = 0; i < n; i++) {
-      const cur = pts[i];
-      const end = mid(cur, pts[(i + 1) % n]);
-      path.quadraticCurveTo(cur.x, cur.y, end.x, end.y);
-    }
+    verts.forEach((v, i) => {
+      const x = Math.cos(v.a) * radius * v.r;
+      const y = Math.sin(v.a) * radius * v.r;
+      if (i === 0) path.moveTo(x, y);
+      else path.lineTo(x, y);
+    });
     path.closePath();
     return path;
+  }
+
+  function polyPath(points) {
+    const path = new Path2D();
+    path.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) path.lineTo(points[i][0], points[i][1]);
+    path.closePath();
+    return path;
+  }
+
+  // Ink-rimmed craters, one to three depending on the rock class.
+  function drawCraters(a) {
+    for (let i = 0; i < a.size; i++) {
+      const cx = (i - (a.size - 1) / 2) * a.r * 0.44;
+      const cy = a.r * (i % 2 === 0 ? -0.1 : 0.22);
+      const cr = Math.max(2.2, a.r * 0.17);
+      ctx.beginPath();
+      ctx.arc(cx, cy, cr, 0, TAU);
+      ctx.fillStyle = "rgba(32,38,43,0.55)";
+      ctx.fill();
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx - cr * 0.22, cy - cr * 0.22, cr * 0.4, 0, TAU);
+      ctx.fillStyle = TINTS[TEAL];
+      ctx.fill();
+    }
   }
 
   function drawAtEdges(x, y, r, fn) {
@@ -1125,17 +1148,10 @@
         ctx.translate(px, py);
         ctx.rotate(a.angle);
         const color = ROCK_COLORS[a.size];
-        inkedShape(softRockPath(a.verts, a.r), color, {
-          x: -a.r * 1.2, y: -a.r * 1.2, w: a.r * 2.4, h: a.r * 0.55
-        }, 3);
-        // One, two or three ink notches make the rock class legible.
-        ctx.fillStyle = INK;
-        for (let i = 0; i < a.size; i++) {
-          ctx.beginPath();
-          ctx.arc((i - (a.size - 1) / 2) * a.r * 0.42, a.r * 0.12,
-            Math.max(1.2, a.r * 0.06), 0, TAU);
-          ctx.fill();
-        }
+        inkedShape(rockPath(a.verts, a.r), color, {
+          x: -a.r * 1.2, y: -a.r * 1.2, w: a.r * 2.4, h: a.r * 0.5
+        }, 3.5);
+        drawCraters(a);
         ctx.restore();
       });
     }
@@ -1169,30 +1185,66 @@
           ctx.save();
           ctx.translate(px, py);
           ctx.rotate(ship.angle);
-          // Small gold flame, a little longer while thrusting.
+          // Gold flame with a pale core, a little longer while thrusting.
           const flame = new Path2D();
           flame.moveTo(-SHIP_R * 0.95, -SHIP_R * 0.42);
-          flame.lineTo(-SHIP_R * (thrusting ? 1.95 : 1.5), 0);
+          flame.lineTo(-SHIP_R * (thrusting ? 2.05 : 1.6), 0);
           flame.lineTo(-SHIP_R * 0.95, SHIP_R * 0.42);
           flame.closePath();
           inkedShape(flame, GOLD, {
-            x: -SHIP_R * 1.1, y: -SHIP_R * 0.45, w: SHIP_R * 2.2, h: SHIP_R * 0.3
+            x: -SHIP_R * 2.1, y: -SHIP_R * 0.45, w: SHIP_R * 1.3, h: SHIP_R * 0.25
           }, 2);
-          const hull = new Path2D();
-          hull.moveTo(SHIP_R * 1.35, 0);
-          hull.lineTo(-SHIP_R, -SHIP_R * 0.9);
-          hull.lineTo(-SHIP_R, SHIP_R * 0.9);
-          hull.closePath();
-          inkedShape(hull, CORAL, {
-            x: -SHIP_R * 1.1, y: -SHIP_R * 0.95, w: SHIP_R * 2.5, h: SHIP_R * 0.45
-          }, 3);
+          const core = polyPath([
+            [-SHIP_R * 0.95, -SHIP_R * 0.2],
+            [-SHIP_R * (thrusting ? 1.65 : 1.35), 0],
+            [-SHIP_R * 0.95, SHIP_R * 0.2]
+          ]);
+          inkedShape(core, TINTS[GOLD], null, 1.5);
+
+          // Coral fins around a cream rocket with a coral nose and tail band.
+          const finTop = polyPath([
+            [-SHIP_R * 0.75, -SHIP_R * 0.45],
+            [-SHIP_R * 1.3, -SHIP_R * 1.05],
+            [-SHIP_R * 0.05, -SHIP_R * 0.5]
+          ]);
+          const finBot = polyPath([
+            [-SHIP_R * 0.75, SHIP_R * 0.45],
+            [-SHIP_R * 1.3, SHIP_R * 1.05],
+            [-SHIP_R * 0.05, SHIP_R * 0.5]
+          ]);
+          inkedShape(finTop, CORAL, { x: -SHIP_R * 1.3, y: -SHIP_R * 1.05, w: SHIP_R * 0.8, h: SHIP_R * 0.3 }, 2);
+          inkedShape(finBot, CORAL, { x: -SHIP_R * 1.3, y: SHIP_R * 0.75, w: SHIP_R * 0.8, h: SHIP_R * 0.3 }, 2);
+
+          const hull = polyPath([
+            [SHIP_R * 1.45, 0],
+            [SHIP_R * 0.25, -SHIP_R * 0.55],
+            [-SHIP_R * 0.95, -SHIP_R * 0.62],
+            [-SHIP_R * 0.95, SHIP_R * 0.62],
+            [SHIP_R * 0.25, SHIP_R * 0.55]
+          ]);
+          inkedShape(hull, CREAM, null, 3);
+          const nose = polyPath([
+            [SHIP_R * 1.45, 0],
+            [SHIP_R * 0.5, -SHIP_R * 0.42],
+            [SHIP_R * 0.5, SHIP_R * 0.42]
+          ]);
+          inkedShape(nose, CORAL, { x: SHIP_R * 0.4, y: -SHIP_R * 0.42, w: SHIP_R * 0.7, h: SHIP_R * 0.2 }, 2.2);
+          const tailBand = polyPath([
+            [-SHIP_R * 0.95, -SHIP_R * 0.24],
+            [-SHIP_R * 0.42, -SHIP_R * 0.24],
+            [-SHIP_R * 0.42, SHIP_R * 0.24],
+            [-SHIP_R * 0.95, SHIP_R * 0.24]
+          ]);
+          inkedShape(tailBand, CORAL, null, 1.8);
+
+          // Teal porthole with a cream glint.
           const canopy = new Path2D();
-          roundRectPath(canopy, -SHIP_R * 0.1, -SHIP_R * 0.25, SHIP_R * 0.8, SHIP_R * 0.5, SHIP_R * 0.2);
-          ctx.fillStyle = TEAL;
-          ctx.fill(canopy);
-          ctx.strokeStyle = INK;
-          ctx.lineWidth = 2;
-          ctx.stroke(canopy);
+          canopy.arc(SHIP_R * 0.25, 0, SHIP_R * 0.27, 0, TAU);
+          inkedShape(canopy, TEAL, null, 2);
+          ctx.beginPath();
+          ctx.arc(SHIP_R * 0.17, -SHIP_R * 0.09, SHIP_R * 0.08, 0, TAU);
+          ctx.fillStyle = CREAM;
+          ctx.fill();
           ctx.restore();
         });
         ctx.globalAlpha = 1;

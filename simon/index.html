@@ -514,10 +514,10 @@
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
   const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
   const CORAL_LT = "#f0a17f", TEAL_LT = "#75bdb2", GOLD_LT = "#f2cf7a";
-  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT };
-  const COLORS = [CORAL, TEAL, GOLD, CREAM];
-  const MARKS = ["dots", "bar", "none", "notch"];
-  const LABELS = ["1", "2", "3", "4"];
+  // The fourth quadrant is the thumbnail's blue, from the shared arcade palette.
+  const BLUE = "#4d7bb0", BLUE_LT = "#7ba3cc";
+  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT, [BLUE]: BLUE_LT };
+  const COLORS = [CORAL, TEAL, GOLD, BLUE];
 
   const canvas = document.getElementById("game");
   const scoreEl = document.getElementById("hudScore");
@@ -613,63 +613,107 @@
     ctx.restore();
   }
 
-  function lightInk(color, lit) {
-    return color === GOLD || color === CREAM || lit ? INK : CREAM;
-  }
-
   function draw() {
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, size, size);
-    rects.forEach((r, i) => {
-      const radius = Math.min(28, r.w * 0.14);
-      const path = new Path2D();
-      roundRectPath(path, r.x, r.y, r.w, r.h, radius);
-      const color = COLORS[i];
-      paintShape(path, color, { x: r.x, y: r.y, w: r.w, h: r.h * 0.24 }, 3);
 
-      // Simple pattern mark so each pad reads differently, not just by hue.
-      const markColor = lightInk(color, false);
-      const mx = r.x + r.w * 0.16, my = r.y + r.h * 0.18;
-      ctx.save();
-      ctx.fillStyle = markColor;
-      ctx.strokeStyle = markColor;
-      ctx.lineWidth = 2;
-      if (MARKS[i] === "dots") {
-        for (const dx of [-4, 4]) { ctx.beginPath(); ctx.arc(mx + dx, my, 2.4, 0, Math.PI * 2); ctx.fill(); }
-      } else if (MARKS[i] === "bar") {
-        ctx.beginPath(); ctx.moveTo(mx - 7, my); ctx.lineTo(mx + 7, my); ctx.stroke();
-      } else if (MARKS[i] === "notch") {
-        ctx.beginPath();
-        ctx.moveTo(mx - 6, my - 3); ctx.lineTo(mx + 6, my - 3); ctx.lineTo(mx, my + 5);
-        ctx.closePath(); ctx.fill();
-      }
-      ctx.restore();
-
-      if (flash[i] > 0) {
-        ctx.save();
-        ctx.fillStyle = TINTS[color] || CREAM;
-        ctx.fill(path);
-        ctx.restore();
-      }
-      ctx.fillStyle = lightInk(color, flash[i] > 0);
-      ctx.font = "800 " + Math.round(Math.max(20, r.w * 0.34)) + "px monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(LABELS[i], r.x + r.w / 2, r.y + r.h / 2);
-    });
-
-    // Chunky ink centre button with a small coral dot.
-    const mid = size / 2;
-    const cr = Math.min(22, Math.max(11, size * 0.055));
-    const button = new Path2D();
-    button.arc(mid, mid, cr, 0, Math.PI * 2);
-    paintShape(button, INK, { x: mid - cr, y: mid - cr, w: cr * 2, h: cr }, 3);
-    const cap = new Path2D();
-    cap.arc(mid - cr * 0.28, mid - cr * 0.3, Math.max(1.5, cr * 0.26), 0, Math.PI * 2);
+    // Three coral sound rays at the upper left, as on the thumbnail controller.
     ctx.save();
-    ctx.fillStyle = CORAL_LT;
-    ctx.fill(cap);
+    ctx.strokeStyle = CORAL;
+    ctx.lineWidth = Math.max(2, size * 0.011);
+    ctx.lineCap = "round";
+    const rayX = size * 0.12, rayY = size * 0.045;
+    for (let i = 0; i < 3; i++) {
+      const a = -2.4 - i * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(rayX + Math.cos(a) * size * 0.012, rayY + Math.sin(a) * size * 0.012);
+      ctx.lineTo(rayX + Math.cos(a) * size * 0.055, rayY + Math.sin(a) * size * 0.055);
+      ctx.stroke();
+    }
     ctx.restore();
+
+    // Rounded-square controller body with a heavy ink rim and a soft shadow.
+    const edge = Math.max(8, size * 0.035);
+    const gap = Math.max(6, size * 0.025);
+    const bx = edge - gap / 2;
+    const by = edge - gap / 2;
+    const bw = size - bx * 2;
+    const bh = size - by * 2;
+    const radius = Math.min(size * 0.22, bw * 0.22);
+    const mid = size / 2;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(32,38,43,0.20)";
+    const shadow = new Path2D();
+    roundRectPath(shadow, bx + size * 0.02, by + size * 0.03, bw, bh, radius);
+    ctx.fill(shadow);
+    ctx.restore();
+
+    const body = new Path2D();
+    roundRectPath(body, bx, by, bw, bh, radius);
+    ctx.fillStyle = INK;
+    ctx.fill(body);
+
+    const inset = Math.max(4, size * 0.016);
+    const inner = new Path2D();
+    roundRectPath(inner, bx + inset, by + inset, bw - inset * 2, bh - inset * 2, radius * 0.85);
+    ctx.fillStyle = CREAM;
+    ctx.fill(inner);
+
+    // Four coloured quadrants meeting at the centre, clipped to the body.
+    ctx.save();
+    ctx.clip(inner);
+    const quads = [
+      { x: 0, y: 0, color: COLORS[0] },
+      { x: mid, y: 0, color: COLORS[1] },
+      { x: 0, y: mid, color: COLORS[2] },
+      { x: mid, y: mid, color: COLORS[3] }
+    ];
+    quads.forEach((q, i) => {
+      ctx.fillStyle = q.color;
+      ctx.fillRect(q.x, q.y, mid, mid);
+      ctx.fillStyle = TINTS[q.color] || CREAM;
+      ctx.fillRect(q.x, q.y, mid, mid * 0.28);
+      // Cream gloss streak on each illustrated button.
+      ctx.strokeStyle = "rgba(255,253,250,0.85)";
+      ctx.lineWidth = Math.max(2, size * 0.012);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(q.x + mid * 0.16, q.y + mid * 0.2);
+      ctx.quadraticCurveTo(q.x + mid * 0.1, q.y + mid * 0.08, q.x + mid * 0.3, q.y + mid * 0.07);
+      ctx.stroke();
+      if (flash[i] > 0) {
+        ctx.fillStyle = TINTS[q.color] || CREAM;
+        ctx.fillRect(q.x, q.y, mid, mid);
+      }
+    });
+    // Thick ink dividers between the quadrants.
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(4, size * 0.018);
+    ctx.beginPath();
+    ctx.moveTo(mid, 0); ctx.lineTo(mid, size);
+    ctx.moveTo(0, mid); ctx.lineTo(size, mid);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(3, size * 0.012);
+    ctx.stroke(inner);
+
+    // Central grey knob with a soft cream highlight.
+    const cr = Math.min(size * 0.105, Math.max(14, size * 0.082));
+    const knob = new Path2D();
+    knob.arc(mid, mid, cr, 0, Math.PI * 2);
+    ctx.fillStyle = "#3a4147";
+    ctx.fill(knob);
+    ctx.lineWidth = Math.max(3, size * 0.014);
+    ctx.strokeStyle = INK;
+    ctx.stroke(knob);
+    ctx.strokeStyle = "rgba(255,253,250,0.5)";
+    ctx.lineWidth = Math.max(2, cr * 0.16);
+    ctx.beginPath();
+    ctx.arc(mid - cr * 0.12, mid - cr * 0.14, cr * 0.7, Math.PI * 1.05, Math.PI * 1.7);
+    ctx.stroke();
 
     if (errorTime > 0) {
       ctx.strokeStyle = CORAL;

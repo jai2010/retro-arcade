@@ -103,6 +103,13 @@
   @media (max-height:520px) and (pointer:coarse) {
     html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%, calc((100dvh - 140px) * .8340))!important; }
   }
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
 </style>
 </head>
 <body>
@@ -137,7 +144,7 @@
     <aside class="side" aria-label="Instructions">
       <section class="panel">
         <h2>Goal</h2>
-        <p>Connect four discs of your colour in a row — across, up or diagonally. You play teal; the machine plays coral.</p>
+        <p>Connect four discs of your colour in a row — across, up or diagonally. You play gold; the machine plays coral.</p>
       </section>
       <section class="panel">
         <h2>Controls</h2>
@@ -343,19 +350,26 @@
     ctx.fillStyle = TINTS[colour] || CREAM;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 0.9);
     ctx.restore();
+    ctx.lineWidth = 3.5;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  // Two ink-outlined teal feet, like the stand in the thumbnail.
+  function drawFoot(x) {
+    roundRect(x, OY + ROWS * CELL + 4, 36, 26, 5);
+    ctx.fillStyle = TEAL;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[TEAL];
+    ctx.fillRect(x, OY + ROWS * CELL + 4, 36, 7);
+    ctx.restore();
     ctx.lineWidth = 3;
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    // A small mark on each side keeps the players readable beyond colour.
-    ctx.fillStyle = colour === TEAL ? CREAM : GOLD;
-    if (colour === TEAL) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.18, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.fillRect(cx - r * 0.24, cy - r * 0.07, r * 0.48, r * 0.14);
-    }
   }
 
   function drawOverlay(title, hint) {
@@ -392,7 +406,7 @@
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    const active = turn === HUMAN ? TEAL : CORAL;
+    const active = turn === HUMAN ? GOLD : CORAL;
     paintDisc(38, 43, 11, active);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
@@ -404,17 +418,20 @@
     ctx.fillText("7 × 6 · connect 4", 60, 61);
 
     roundRect(OX - 8, OY - 8, COLS * CELL + 16, ROWS * CELL + 16, 12);
-    ctx.fillStyle = GOLD;
+    ctx.fillStyle = TEAL;
     ctx.fill();
     ctx.save();
     ctx.clip();
-    ctx.fillStyle = TINTS[GOLD];
+    ctx.fillStyle = TINTS[TEAL];
     ctx.fillRect(OX - 8, OY - 8, COLS * CELL + 16, (ROWS * CELL + 16) * 0.24);
     ctx.restore();
     ctx.lineWidth = 3;
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
+
+    drawFoot(OX - 8);
+    drawFoot(OX + COLS * CELL - 28);
 
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
@@ -430,7 +447,7 @@
         ctx.fillStyle = PAPER;
         ctx.fillRect(cx - r, cy - r, r * 2, r * 0.7);
         ctx.restore();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.strokeStyle = INK;
         ctx.stroke();
       }
@@ -439,7 +456,7 @@
     if (!roundOver && !paused && started && hoverCol >= 0 && landing(hoverCol) >= 0) {
       const cx = OX + hoverCol * CELL + CELL / 2;
       ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = turn === HUMAN ? TEAL : CORAL;
+      ctx.strokeStyle = turn === HUMAN ? GOLD : CORAL;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(cx, OY - 14, CELL * 0.38, 0, Math.PI * 2);
@@ -456,7 +473,7 @@
           const t = Math.min(1, dropAnim.t);
           cy = OY - CELL * 0.4 + (cy - (OY - CELL * 0.4)) * (1 - Math.pow(1 - t, 2));
         }
-        paintDisc(OX + col * CELL + CELL / 2, cy, CELL * 0.39, value === HUMAN ? TEAL : CORAL);
+        paintDisc(OX + col * CELL + CELL / 2, cy, CELL * 0.39, value === HUMAN ? GOLD : CORAL);
       }
     }
 

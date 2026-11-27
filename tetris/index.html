@@ -1047,21 +1047,37 @@
     ctx.closePath();
   }
 
-  // Flat palette fill, thick ink outline and a lighter top band — the same
-  // construction used by the arcade thumbnail illustrations.
+  // Chunky illustrated block: dark bevel underneath, flat colour face with a
+  // lighter top band and a cream shine, all wrapped in a heavy ink outline —
+  // the same treatment as the stacked blocks in the thumbnail.
   function drawBlock(ctx, x, y, color) {
     const pad = 1.5;
     const size = CELL - pad * 2;
     const bx = x + pad, by = y + pad;
-    roundRect(ctx, bx, by, size, size, 5);
+    const faceW = size - 1.5, faceH = size - 2.5;
+
+    roundRect(ctx, bx + 1.5, by + 2, size - 1, size - 1, 5);
+    ctx.fillStyle = "rgba(32,38,43,0.42)";
+    ctx.fill();
+
+    roundRect(ctx, bx, by, faceW, faceH, 5);
     ctx.fillStyle = color;
     ctx.fill();
     ctx.save();
     ctx.clip();
     ctx.fillStyle = TINTS[color] || CREAM;
-    ctx.fillRect(bx, by, size, Math.max(3, size * 0.24));
+    ctx.fillRect(bx, by, faceW, Math.max(3, faceH * 0.3));
+    ctx.strokeStyle = "rgba(255,253,250,0.88)";
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(bx + 4, by + 6.5);
+    ctx.lineTo(bx + 9.5, by + 3.5);
+    ctx.stroke();
     ctx.restore();
-    ctx.lineWidth = 3;
+
+    roundRect(ctx, bx, by, faceW, faceH, 5);
+    ctx.lineWidth = 2.6;
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();

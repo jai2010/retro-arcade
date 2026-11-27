@@ -628,7 +628,8 @@
   const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
   const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
 
-  const ROW_COLORS = [CORAL, GOLD, TEAL, CORAL, GOLD];
+  // Coral, teal and gold rows as in the thumbnail's chunky brick wall.
+  const ROW_COLORS = [CORAL, TEAL, GOLD, CORAL, TEAL];
 
   const boardCanvas = document.getElementById("board");
   const boardWrap = document.getElementById("boardWrap");
@@ -896,23 +897,37 @@
     ctx.closePath();
   }
 
-  // Flat palette fill, thick ink outline and a two-tone top band — the same
-  // construction used by the arcade thumbnail illustrations.
+  // Chunky illustrated bricks/paddle: dark bevel, flat face with a lighter top
+  // band, a cream shine streak and a heavy ink edge — the thumbnail treatment.
   function paintRoundRect(ctx, x, y, w, h, r, color) {
-    roundRect(ctx, x, y, w, h, r);
+    roundRect(ctx, x + 1.5, y + 2.5, w - 1, h - 1, r);
+    ctx.fillStyle = "rgba(32,38,43,0.38)";
+    ctx.fill();
+
+    roundRect(ctx, x, y, w - 1, h - 2, r);
     ctx.fillStyle = color;
     ctx.fill();
     ctx.save();
     ctx.clip();
     ctx.fillStyle = TINTS[color] || CREAM;
-    ctx.fillRect(x, y, w, Math.max(2, h * 0.24));
+    ctx.fillRect(x, y, w, Math.max(2, h * 0.26));
+    ctx.strokeStyle = "rgba(255,253,250,0.85)";
+    ctx.lineWidth = Math.max(2, h * 0.12);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x + 5, y + h * 0.38);
+    ctx.lineTo(x + Math.min(w * 0.34, 16), y + h * 0.22);
+    ctx.stroke();
     ctx.restore();
-    ctx.lineWidth = 3;
+
+    roundRect(ctx, x, y, w - 1, h - 2, r);
+    ctx.lineWidth = 2.6;
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
   }
 
+  // A coral ball with a cream highlight, ink rim and a thin coral motion trail.
   function paintBall(x, y, radius, color) {
     boardCtx.beginPath();
     boardCtx.arc(x, y, radius, 0, Math.PI * 2);
@@ -921,38 +936,36 @@
     boardCtx.save();
     boardCtx.clip();
     boardCtx.fillStyle = TINTS[color] || CREAM;
-    boardCtx.fillRect(x - radius, y - radius, radius * 2, Math.max(2, radius * 0.9));
+    boardCtx.fillRect(x - radius, y - radius, radius * 2, radius * 1.1);
+    boardCtx.beginPath();
+    boardCtx.arc(x - radius * 0.3, y - radius * 0.32, radius * 0.4, 0, Math.PI * 2);
+    boardCtx.fillStyle = CREAM;
+    boardCtx.fill();
     boardCtx.restore();
+    boardCtx.beginPath();
+    boardCtx.arc(x, y, radius, 0, Math.PI * 2);
     boardCtx.lineWidth = 2;
     boardCtx.lineJoin = "round";
     boardCtx.strokeStyle = INK;
     boardCtx.stroke();
   }
 
-  // Small ink marks keep the repeating row colours distinct.
-  function paintBrickMark(brick) {
-    const cx = brick.x + brick.w / 2;
-    const cy = brick.y + brick.h / 2;
-    boardCtx.fillStyle = INK;
-    boardCtx.strokeStyle = INK;
-    boardCtx.lineWidth = 1.5;
+  function paintBallTrail() {
+    if (ball.stuck || paused || gameOver) return;
+    const speed = Math.hypot(ball.vx, ball.vy) || 1;
+    const ux = ball.vx / speed, uy = ball.vy / speed;
+    boardCtx.strokeStyle = TINTS[CORAL];
+    boardCtx.lineWidth = 2.2;
     boardCtx.lineCap = "round";
-    if (brick.row % 3 === 0) {
+    for (let i = 1; i <= 3; i++) {
+      const d = 10 + i * 7;
+      boardCtx.globalAlpha = 0.7 - i * 0.16;
       boardCtx.beginPath();
-      boardCtx.arc(cx, cy, 2, 0, Math.PI * 2);
-      boardCtx.fill();
-    } else if (brick.row % 3 === 1) {
-      boardCtx.beginPath();
-      boardCtx.moveTo(cx - 5, cy);
-      boardCtx.lineTo(cx + 5, cy);
-      boardCtx.stroke();
-    } else {
-      boardCtx.beginPath();
-      boardCtx.moveTo(cx - 4, cy - 2);
-      boardCtx.lineTo(cx, cy + 3);
-      boardCtx.lineTo(cx + 4, cy - 2);
+      boardCtx.moveTo(ball.x - ux * d - uy * 3, ball.y - uy * d + ux * 3);
+      boardCtx.lineTo(ball.x - ux * (d + 6) - uy, ball.y - uy * (d + 6) + ux);
       boardCtx.stroke();
     }
+    boardCtx.globalAlpha = 1;
   }
 
   function drawBoard(now) {
@@ -977,11 +990,11 @@
     for (const brick of bricks) {
       if (!brick.alive) continue;
       paintRoundRect(boardCtx, brick.x, brick.y, brick.w, brick.h, 5, brick.color);
-      paintBrickMark(brick);
     }
 
     paintRoundRect(boardCtx, paddleX - PADDLE_W / 2, PADDLE_Y, PADDLE_W, PADDLE_H, 6, TEAL);
 
+    paintBallTrail();
     paintBall(ball.x, ball.y, BALL_R, CORAL);
 
     if (ball.stuck && !paused && !gameOver) {

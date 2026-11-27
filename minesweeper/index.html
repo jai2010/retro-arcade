@@ -100,6 +100,13 @@
   @media (max-height:520px) and (pointer:coarse) {
     html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%,calc((100dvh - 140px) * 1.0000)) !important; }
   }
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
 </style>
 </head>
 <body>
@@ -181,7 +188,7 @@
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
   const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
   const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
-  const NUM_COLORS = [TEAL, CORAL, GOLD, INK, TEAL, CORAL, GOLD, INK];
+  const SAND = "#ede7dc";
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
@@ -403,6 +410,7 @@
     });
   }
 
+  // Small teal flag with an ink pole, as in the thumbnail's corner cluster.
   function drawFlag(cx, cy, s) {
     ctx.strokeStyle = INK;
     ctx.lineWidth = Math.max(2, s * 0.1);
@@ -415,11 +423,11 @@
     ctx.lineTo(cx + s * 0.55, cy - s * 0.28);
     ctx.lineTo(cx - s * 0.14, cy + s * 0.05);
     ctx.closePath();
-    ctx.fillStyle = CORAL;
+    ctx.fillStyle = TEAL;
     ctx.fill();
     ctx.save();
     ctx.clip();
-    ctx.fillStyle = TINTS[CORAL];
+    ctx.fillStyle = TINTS[TEAL];
     ctx.fillRect(cx - s * 0.14, cy - s * 0.58, s * 0.69, s * 0.22);
     ctx.restore();
     ctx.lineWidth = Math.max(2, s * 0.08);
@@ -432,33 +440,40 @@
     ctx.stroke();
   }
 
+  // Coral spiky mine: twelve ink rays around a tinted coral ball with two
+  // cream glints, matching the illustrated mine in the thumbnail.
   function drawMine(cx, cy, s) {
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = Math.max(2, s * 0.12);
-    ctx.lineCap = "round";
-    for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4;
+    ctx.fillStyle = INK;
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6 + Math.PI / 12;
+      const nx = Math.cos(a), ny = Math.sin(a);
+      const tx = -ny, ty = nx;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * s * 0.38, cy + Math.sin(a) * s * 0.38);
-      ctx.lineTo(cx + Math.cos(a) * s * 0.72, cy + Math.sin(a) * s * 0.72);
-      ctx.stroke();
+      ctx.moveTo(cx + nx * s * 0.4 + tx * s * 0.1, cy + ny * s * 0.4 + ty * s * 0.1);
+      ctx.lineTo(cx + nx * s * 0.96, cy + ny * s * 0.96);
+      ctx.lineTo(cx + nx * s * 0.4 - tx * s * 0.1, cy + ny * s * 0.4 - ty * s * 0.1);
+      ctx.closePath();
+      ctx.fill();
     }
     ctx.beginPath();
-    ctx.arc(cx, cy, s * 0.42, 0, Math.PI * 2);
+    ctx.arc(cx, cy, s * 0.54, 0, Math.PI * 2);
     ctx.fillStyle = CORAL;
     ctx.fill();
     ctx.save();
     ctx.clip();
     ctx.fillStyle = TINTS[CORAL];
-    ctx.fillRect(cx - s * 0.42, cy - s * 0.42, s * 0.84, s * 0.4);
+    ctx.fillRect(cx - s * 0.54, cy - s * 0.54, s * 1.08, s * 0.52);
     ctx.restore();
     ctx.lineWidth = 3;
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(cx - s * 0.13, cy - s * 0.14, s * 0.1, 0, Math.PI * 2);
+    ctx.ellipse(cx - s * 0.15, cy - s * 0.18, s * 0.14, s * 0.1, -0.5, 0, Math.PI * 2);
     ctx.fillStyle = CREAM;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + s * 0.24, cy + s * 0.12, s * 0.055, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -471,11 +486,12 @@
     const bw = cw - pad * 2, bh = ch - pad * 2;
     const radius = Math.min(cw, ch) * 0.14;
 
-    ctx.strokeStyle = "rgba(32,38,43,0.10)";
-    ctx.lineWidth = 1.5;
-    for (let i = 1; i < GRID; i++) {
-      ctx.beginPath(); ctx.moveTo(i * cw + .5, 0); ctx.lineTo(i * cw + .5, H); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i * ch + .5); ctx.lineTo(W, i * ch + .5); ctx.stroke();
+    // Thin sand grid lines over the cream field, like the thumbnail.
+    ctx.strokeStyle = SAND;
+    ctx.lineWidth = Math.max(2, cw * 0.035);
+    for (let i = 0; i <= GRID; i++) {
+      ctx.beginPath(); ctx.moveTo(i * cw, 0); ctx.lineTo(i * cw, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * ch); ctx.lineTo(W, i * ch); ctx.stroke();
     }
 
     if (!isPhone) {
@@ -492,27 +508,20 @@
         const x = c * cw + pad, y = r * ch + pad;
         roundRect(x, y, bw, bh, radius);
         if (cell.revealed) {
-          ctx.fillStyle = PAPER;
-          ctx.fill();
-          ctx.save();
-          ctx.clip();
           ctx.fillStyle = CREAM;
-          ctx.fillRect(x, y, bw, bh * 0.24);
-          ctx.restore();
-          ctx.strokeStyle = INK;
-          ctx.lineWidth = 2.5;
+          ctx.fill();
+          ctx.strokeStyle = SAND;
+          ctx.lineWidth = 2;
           ctx.lineJoin = "round";
           ctx.stroke();
           if (cell.mine) drawMine(x + bw / 2, y + bh / 2, Math.min(bw, bh) * 0.46);
           else if (cell.count > 0) {
-            const colour = NUM_COLORS[cell.count - 1];
-            ctx.fillStyle = colour;
+            ctx.fillStyle = TEAL;
             ctx.font = "700 " + Math.round(Math.min(bw, bh) * 0.5) + "px monospace";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(String(cell.count), x + bw / 2, y + bh * 0.45);
-            // Count dots make each number read by pattern as well as colour.
-            ctx.fillStyle = colour === INK ? CREAM : INK;
+            // Teal count dots, like the number clusters in the thumbnail.
             const gap = Math.min(bw, bh) * 0.09;
             for (let i = 0; i < cell.count; i++) {
               ctx.beginPath();
@@ -526,14 +535,14 @@
           ctx.save();
           ctx.clip();
           ctx.fillStyle = TINTS[GOLD];
-          ctx.fillRect(x, y, bw, bh * 0.22);
+          ctx.fillRect(x, y, bw, bh * 0.16);
           ctx.restore();
-          ctx.strokeStyle = INK;
-          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = SAND;
+          ctx.lineWidth = 2;
           ctx.lineJoin = "round";
           ctx.stroke();
           roundRect(x + bw * 0.12, y + bh * 0.12, bw * 0.76, bh * 0.76, radius * 0.6);
-          ctx.strokeStyle = INK;
+          ctx.strokeStyle = SAND;
           ctx.lineWidth = 1.5;
           ctx.stroke();
           if (cell.flagged) drawFlag(x + bw / 2, y + bh / 2, Math.min(bw, bh) * 0.52);

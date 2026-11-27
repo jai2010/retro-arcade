@@ -102,6 +102,13 @@
   @media (max-height:520px) and (pointer:coarse) {
     html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%, calc((100dvh - 140px) * .8182))!important; }
   }
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
 </style>
 </head>
 <body>
@@ -384,46 +391,91 @@
     ctx.stroke();
   }
 
+  // The crate from the thumbnail: a coral box in three-quarter view with a
+  // lighter top face and a bold ink X on the inset front panel. A delivered
+  // crate keeps the same drawing in gold.
   function drawCrate(x, y, onTarget) {
     const px = ox + x * CELL + 4, py = OY + y * CELL + 4, size = CELL - 8;
-    // Coral crate with an ink X; a delivered crate turns gold.
-    paintShape(px, py, size, size, 7, onTarget ? GOLD : CORAL);
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
+    const face = onTarget ? GOLD : CORAL;
+    const tint = onTarget ? TINTS[GOLD] : TINTS[CORAL];
+    // Shallow top face peeking above the front of the box.
     ctx.beginPath();
-    ctx.moveTo(px + 7, py + 7); ctx.lineTo(px + size - 7, py + size - 7);
-    ctx.moveTo(px + size - 7, py + 7); ctx.lineTo(px + 7, py + size - 7);
+    ctx.moveTo(px + 2, py + 6);
+    ctx.lineTo(px + 10, py + 1);
+    ctx.lineTo(px + size - 2, py + 2);
+    ctx.lineTo(px + size - 5, py + 7);
+    ctx.closePath();
+    ctx.fillStyle = tint; ctx.fill();
+    ctx.lineWidth = 2.5; ctx.lineJoin = "round"; ctx.strokeStyle = INK; ctx.stroke();
+    // Front face with a two-tone top band.
+    roundRect(px + 2, py + 5, size - 5, size - 6, 4);
+    ctx.fillStyle = face; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = tint; ctx.fillRect(px + 2, py + 5, size - 5, 6);
+    ctx.restore();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
+    // Inset panel and the X.
+    const ins = 8;
+    const ix = px + 2 + ins, iy = py + 5 + ins;
+    const iw = size - 5 - ins * 2, ih = size - 6 - ins * 2;
+    roundRect(ix, iy, iw, ih, 2);
+    ctx.fillStyle = face; ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(ix + 3, iy + 3); ctx.lineTo(ix + iw - 3, iy + ih - 3);
+    ctx.moveTo(ix + iw - 3, iy + 3); ctx.lineTo(ix + 3, iy + ih - 3);
     ctx.stroke();
   }
 
+  // Drawing-only orientation: the worker stays upright and is mirrored when
+  // walking left, just like the thumbnail character. Gameplay facing is
+  // untouched.
+  let drawFacing = 1;
+
+  // The worker from the thumbnail: teal cap and body, gold helmet band, cream
+  // face and arms out in a pushing pose. Everything is drawn inside one cell.
   function drawPlayer() {
+    if (facing.x) drawFacing = facing.x;
     const cx = ox + player.x * CELL + CELL / 2;
     const cy = OY + player.y * CELL + CELL / 2;
-    const r = CELL * 0.34;
-    paintCircle(cx, cy, r, TEAL);
-    // Gold helmet band, like the little worker in the thumbnail.
     ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, r - 1, 0, Math.PI * 2); ctx.clip();
-    ctx.fillStyle = GOLD;
-    ctx.fillRect(cx - r, cy - r, r * 2, 7);
+    ctx.translate(cx, cy);
+    ctx.scale(drawFacing, 1);
+    if (facing.y < 0) ctx.rotate(-0.12);
+    else if (facing.y > 0) ctx.rotate(0.12);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    const edge = (w) => { ctx.lineWidth = w; ctx.strokeStyle = INK; ctx.stroke(); };
+    const coloured = (w, c) => { ctx.lineWidth = w; ctx.strokeStyle = c; ctx.stroke(); };
+
+    // Back leg, shaded a little darker like the illustration.
+    ctx.beginPath();
+    ctx.moveTo(-3, 7); ctx.lineTo(-11, 13); ctx.lineTo(-11, 17); ctx.lineTo(-16, 17);
+    edge(7); coloured(4, "#2f7c74");
+    // Front leg.
+    ctx.beginPath();
+    ctx.moveTo(1, 7); ctx.lineTo(3, 15); ctx.lineTo(9, 15);
+    edge(7); coloured(4, TEAL);
+
+    // Torso.
+    ctx.beginPath();
+    ctx.moveTo(-8, -3); ctx.lineTo(3, -3); ctx.lineTo(3, 9); ctx.lineTo(-6, 9);
+    ctx.closePath(); ctx.fillStyle = TEAL; ctx.fill(); edge(2.5);
+
+    // Extended pushing arm and gold hand.
+    ctx.beginPath(); ctx.moveTo(-1, 1); ctx.lineTo(13, 1);
+    edge(10); coloured(7, TEAL);
+    roundRect(11, -3, 5, 8, 2); ctx.fillStyle = GOLD; ctx.fill(); edge(2);
+
+    // Head: teal cap, gold helmet band, cream face with one ink eye.
+    roundRect(-8, -18, 15, 9, 3); ctx.fillStyle = TEAL; ctx.fill(); edge(2.5);
+    roundRect(-8, -10, 15, 7, 1.5); ctx.fillStyle = GOLD; ctx.fill(); edge(2.5);
+    ctx.beginPath();
+    ctx.moveTo(-7, -4); ctx.lineTo(7, -4); ctx.lineTo(5, 2); ctx.lineTo(-6, 2);
+    ctx.closePath(); ctx.fillStyle = CREAM; ctx.fill(); edge(2);
+    ctx.beginPath(); ctx.arc(3, -1, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = INK; ctx.fill();
     ctx.restore();
-    const ex = facing.x * 3.5, ey = facing.y * 3.5;
-    for (const side of [-1, 1]) {
-      const px = cx + (-facing.y * side * 6) + ex;
-      const py = cy + (facing.x * side * 6) + ey;
-      ctx.beginPath();
-      ctx.arc(px, py, 3.2, 0, Math.PI * 2);
-      ctx.fillStyle = CREAM;
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = INK;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(px + ex * 0.3, py + ey * 0.3, 1.4, 0, Math.PI * 2);
-      ctx.fillStyle = INK;
-      ctx.fill();
-    }
   }
 
   function draw() {
@@ -458,23 +510,24 @@
       }
     }
 
-    // Gold diamond with a coral ring marks a target.
+    // Gold diamond with a coral ring, exactly like the thumbnail target.
     for (const t of targets) {
       const cx = ox + t.x * CELL + CELL / 2, cy = OY + t.y * CELL + CELL / 2;
-      const s = CELL * 0.68;
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(Math.PI / 4);
-      paintShape(-s / 2, -s / 2, s, s, 5, GOLD);
-      ctx.restore();
+      const s = CELL * 0.36;
       ctx.beginPath();
-      ctx.ellipse(cx, cy, CELL * 0.19, CELL * 0.12, 0, 0, Math.PI * 2);
-      ctx.fillStyle = CORAL;
-      ctx.fill();
-      ctx.lineWidth = 2.5;
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = INK;
-      ctx.stroke();
+      ctx.moveTo(cx, cy - s);
+      ctx.lineTo(cx + s, cy);
+      ctx.lineTo(cx, cy + s);
+      ctx.lineTo(cx - s, cy);
+      ctx.closePath();
+      ctx.fillStyle = GOLD; ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.fillStyle = TINTS[GOLD]; ctx.fillRect(cx - s, cy - s, s * 2, s * 0.7);
+      ctx.restore();
+      ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, CELL * 0.17, CELL * 0.11, 0, 0, Math.PI * 2);
+      ctx.lineWidth = 3.5; ctx.strokeStyle = CORAL; ctx.stroke();
     }
 
     for (const crate of crates) {

@@ -76,6 +76,13 @@
   html.no-touch-pad .gesture-tip.is-open{display:flex}
   .tip-close{flex:0 0 auto;width:30px;height:30px;padding:0;border:1px solid rgba(128,128,128,.35);border-radius:50%;background:transparent;color:inherit;font:18px/1 monospace;cursor:pointer}
   @media(max-height:520px) and (pointer:coarse){html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 140px) * 0.7600))!important}}
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
 </style>
 </head>
 <body>
@@ -152,6 +159,7 @@
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
   const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
   const TINTS = { "#e5724c": "#f0a17f", "#3f9b91": "#75bdb2", "#e6b34d": "#f2cf7a" };
+  const GREY = "#a1b3b2", GREY_DK = "#567f83"; // grey-blue crater rock in the thumbnail
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const scoreEl = document.getElementById("score");
@@ -365,40 +373,78 @@
     ctx.stroke();
   }
 
+  // The coral rocket from the thumbnail: pointed nose, gold-ringed round
+  // window, side nubs, a panelled engine skirt, four thin legs and a gold
+  // flame. The inner feet stay at ±11 — the touchdown points used by physics.
   function drawLander() {
     ctx.save(); ctx.translate(lander.x, lander.y);
     ctx.rotate(lander.angle);
-    // Engine flame, behind everything else: coral with a gold core.
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    const edge = (w) => { ctx.lineWidth = w; ctx.strokeStyle = INK; ctx.stroke(); };
+
+    // Gold flame with a lighter core, behind the craft.
     if (lander.thrusting) {
-      const flick = 9 + Math.random() * 7;
-      ctx.beginPath(); ctx.moveTo(-5, 9);
-      ctx.lineTo(0, 9 + flick); ctx.lineTo(5, 9);
-      ctx.closePath(); ctx.fillStyle = CORAL;
-      ctx.fill(); ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = INK; ctx.stroke();
+      const flick = 10 + Math.random() * 6;
       ctx.beginPath();
-      ctx.moveTo(-2.5, 9); ctx.lineTo(0, 9 + flick * 0.6);
-      ctx.lineTo(2.5, 9); ctx.closePath();
-      ctx.fillStyle = GOLD; ctx.fill();
+      ctx.moveTo(-4, 16); ctx.lineTo(0, 16 + flick);
+      ctx.lineTo(4, 16); ctx.lineTo(0, 18);
+      ctx.closePath(); ctx.fillStyle = GOLD; ctx.fill(); edge(2.5);
+      ctx.beginPath();
+      ctx.moveTo(-1.8, 16.5); ctx.lineTo(0, 16 + flick * 0.72);
+      ctx.lineTo(1.8, 16.5); ctx.lineTo(0, 18);
+      ctx.closePath(); ctx.fillStyle = TINTS[GOLD]; ctx.fill();
     }
-    // Legs and pads.
-    ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.beginPath(); ctx.moveTo(-7, 5); ctx.lineTo(-11, 11); ctx.lineTo(-15, 11);
-    ctx.moveTo(7, 5); ctx.lineTo(11, 11); ctx.lineTo(15, 11); ctx.stroke();
-    // Coral capsule body with a lighter band and a gold window.
-    ctx.beginPath(); ctx.moveTo(0, -12);
-    ctx.lineTo(8, -3); ctx.lineTo(7, 7);
-    ctx.lineTo(-7, 7); ctx.lineTo(-8, -3);
-    ctx.closePath(); ctx.fillStyle = CORAL;
-    ctx.fill();
+
+    // Four thin landing legs, each with a flat foot.
+    const legs = [[-6, 8, -11, 11], [-9, 8, -15, 13], [6, 8, 11, 11], [9, 8, 15, 13]];
+    for (const [x1, y1, x2, y2] of legs) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); edge(2.6);
+      ctx.beginPath(); ctx.moveTo(x2 - 3, y2); ctx.lineTo(x2 + 3, y2); edge(2.6);
+    }
+
+    // Nozzle and panelled engine skirt.
+    ctx.beginPath();
+    ctx.moveTo(-4, 11); ctx.lineTo(4, 11); ctx.lineTo(3, 16); ctx.lineTo(-3, 16);
+    ctx.closePath(); ctx.fillStyle = TINTS[CORAL]; ctx.fill(); edge(2.5);
+    ctx.beginPath();
+    ctx.moveTo(-9, 5); ctx.lineTo(9, 5); ctx.lineTo(7, 12); ctx.lineTo(-7, 12);
+    ctx.closePath(); ctx.fillStyle = CORAL; ctx.fill(); edge(2.5);
+    ctx.beginPath();
+    ctx.moveTo(-5, 6); ctx.lineTo(-6, 11);
+    ctx.moveTo(5, 6); ctx.lineTo(6, 11);
+    edge(1.8);
+
+    // Small side thruster nubs.
+    for (const nx of [-14, 10]) {
+      roundRect(nx, -4, 4, 6, 1); ctx.fillStyle = CORAL; ctx.fill(); edge(2);
+    }
+
+    // Main body with a two-tone top band.
+    roundRect(-10, -7, 20, 13, 4);
+    ctx.fillStyle = CORAL; ctx.fill();
     ctx.save(); ctx.clip();
-    ctx.fillStyle = TINTS[CORAL]; ctx.fillRect(-8, -12, 16, 6);
+    ctx.fillStyle = TINTS[CORAL]; ctx.fillRect(-10, -7, 20, 4);
     ctx.restore();
-    ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = INK; ctx.stroke();
-    ctx.fillStyle = GOLD; ctx.fillRect(-7, 3, 14, 3);
-    ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.strokeRect(-7, 3, 14, 3);
-    ctx.beginPath(); ctx.arc(0, -3, 3.4, 0, Math.PI * 2);
-    ctx.fillStyle = GOLD; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
-    ctx.beginPath(); ctx.arc(1, -4, 1.1, 0, Math.PI * 2); ctx.fillStyle = CREAM; ctx.fill();
+    edge(2.5);
+
+    // Round gold window with a cream centre.
+    ctx.beginPath(); ctx.arc(0, -1, 5.4, 0, Math.PI * 2);
+    ctx.fillStyle = GOLD; ctx.fill(); edge(2.5);
+    ctx.beginPath(); ctx.arc(0, -1, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = CREAM; ctx.fill(); edge(1.5);
+
+    // Pointed nose cone and the ink band under it.
+    ctx.beginPath();
+    ctx.moveTo(0, -21);
+    ctx.quadraticCurveTo(9, -14, 9, -7);
+    ctx.lineTo(-9, -7);
+    ctx.quadraticCurveTo(-9, -14, 0, -21);
+    ctx.closePath(); ctx.fillStyle = CORAL; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = TINTS[CORAL]; ctx.fillRect(-9, -21, 18, 5);
+    ctx.restore();
+    edge(2.5);
+    ctx.beginPath(); ctx.moveTo(-9, -7); ctx.lineTo(9, -7); edge(2.5);
     ctx.restore();
   }
 
@@ -419,29 +465,14 @@
   function draw() {
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
-    // Star field and a gold crescent moon, all vector marks on the canvas.
-    ctx.fillStyle = INK;
+    // Pale dots on the paper sky, as in the thumbnail.
+    ctx.fillStyle = "rgba(32,38,43,0.32)";
     for (let i = 0; i < 34; i++) {
       const sx = (i * 97 + 43) % W;
       const sy = (i * 61 + 19) % 230;
       ctx.fillRect(sx, sy, i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1);
     }
-    ctx.beginPath();
-    ctx.arc(276, 68, 19, 0, Math.PI * 2);
-    ctx.fillStyle = GOLD; ctx.fill();
-    ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = INK; ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(283, 62, 17, 0, Math.PI * 2);
-    ctx.fillStyle = CREAM; ctx.fill();
-    ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
-    // Distant ridge, then the solid teal ground with crater marks.
-    ctx.beginPath();
-    ctx.moveTo(0, 330);
-    ctx.lineTo(56, 300); ctx.lineTo(112, 326); ctx.lineTo(186, 292);
-    ctx.lineTo(258, 322); ctx.lineTo(W, 300); ctx.lineTo(W, H); ctx.lineTo(0, H);
-    ctx.closePath();
-    ctx.fillStyle = TINTS[TEAL]; ctx.fill();
-    ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    // Solid teal ground follows the physics terrain line.
     ctx.beginPath();
     ctx.moveTo(0, terrain[0].y);
     for (const p of terrain) ctx.lineTo(p.x, p.y);
@@ -453,25 +484,43 @@
     ctx.moveTo(0, terrain[0].y);
     for (const p of terrain) ctx.lineTo(p.x, p.y);
     ctx.lineWidth = 3; ctx.strokeStyle = TINTS[TEAL]; ctx.stroke();
-    for (const cx of [42, 92, 252, 308]) {
-      const cy = terrainHeight(cx) + 18;
-      if (cy < H - 6) {
-        ctx.beginPath(); ctx.ellipse(cx, cy, 11, 4, 0, 0, Math.PI * 2);
-        ctx.fillStyle = TINTS[TEAL]; ctx.fill();
-        ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
-      }
+    // Grey-blue craters: dark cylindrical walls with lighter elliptical rims.
+    const craters = [
+      { x: 44, y: Math.max(terrainHeight(44) + 22, H - 56), r: 29 },
+      { x: 170, y: Math.max(terrainHeight(170) + 22, H - 30), r: 26 },
+      { x: 288, y: Math.max(terrainHeight(288) + 22, H - 60), r: 32 }
+    ];
+    for (const c of craters) {
+      ctx.beginPath();
+      ctx.moveTo(c.x - c.r, c.y);
+      ctx.lineTo(c.x - c.r + 3, H + 12);
+      ctx.lineTo(c.x + c.r - 3, H + 12);
+      ctx.lineTo(c.x + c.r, c.y);
+      ctx.closePath();
+      ctx.fillStyle = GREY_DK; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, c.r, c.r * 0.26, 0, 0, Math.PI * 2);
+      ctx.fillStyle = GREY; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
     }
-    // Landing pad: teal strip, lighter inset, coral corner lights.
-    ctx.fillStyle = TEAL; ctx.fillRect(padX, padY, padW, 5);
-    ctx.fillStyle = TINTS[TEAL]; ctx.fillRect(padX + 3, padY + 1, padW - 6, 2);
-    ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(padX, padY, padW, 5);
-    for (const lx of [padX + 4, padX + padW - 4]) {
-      paintCircle(lx, padY - 3, 2.6, CORAL);
-    }
-    ctx.fillStyle = INK;
-    ctx.font = "10px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("LZ", padX + padW / 2, padY - 12);
+    // Landing pad: teal trapezoid with a cream oval and a darker front lip.
+    ctx.beginPath();
+    ctx.moveTo(padX, padY + 3); ctx.lineTo(padX + padW, padY + 3);
+    ctx.lineTo(padX + padW, padY + 10); ctx.lineTo(padX, padY + 10);
+    ctx.closePath(); ctx.fillStyle = "#2f7c74"; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(padX + 5, padY + 3); ctx.lineTo(padX + padW - 5, padY + 3);
+    ctx.lineTo(padX + padW + 3, padY - 3); ctx.lineTo(padX - 3, padY - 3);
+    ctx.closePath(); ctx.fillStyle = TEAL; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = TINTS[TEAL]; ctx.fillRect(padX - 3, padY - 3, padW + 6, 2);
+    ctx.restore();
+    ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(padX + padW / 2, padY, padW * 0.24, 4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = CREAM; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
     // Dashed velocity cue while flying.
     if (started && !paused && !gameOver && !landed) {
       ctx.strokeStyle = GOLD;

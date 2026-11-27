@@ -102,6 +102,13 @@
   @media (max-height:520px) and (pointer:coarse) {
     html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%, calc((100dvh - 140px) * .8696))!important; }
   }
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
 </style>
 </head>
 <body>
@@ -272,33 +279,86 @@
     ctx.closePath();
   }
 
-  // Flat palette fill, thick ink outline and a two-tone top band — shared by every tile.
+  // The thumbnail's tiles: cream faces with heavy ink marks instead of numerals.
+  // Each value gets its own arrow, chevron, corner or dot pattern.
+  function drawMark(value, cx, cy, s) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.fillStyle = INK;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(3, s * 0.1);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const dot = (x, y, scale = 1) => {
+      ctx.beginPath(); ctx.arc(x, y, s * 0.075 * scale, 0, Math.PI * 2); ctx.fill();
+    };
+    const dots = (n, vertical) => {
+      for (let i = 0; i < n; i++) {
+        const d = (i - (n - 1) / 2) * s * 0.24;
+        if (vertical) dot(0, d); else dot(d, 0);
+      }
+    };
+    const arrow = angle => {
+      ctx.save(); ctx.rotate(angle);
+      ctx.beginPath(); ctx.moveTo(-s * 0.3, 0); ctx.lineTo(s * 0.08, 0); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(s * 0.04, -s * 0.22); ctx.lineTo(s * 0.32, 0); ctx.lineTo(s * 0.04, s * 0.22);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    };
+    const chevron = (angle, twice = false) => {
+      ctx.save(); ctx.rotate(angle);
+      const shifts = twice ? [-s * 0.16, s * 0.1] : [0];
+      for (const shift of shifts) {
+        ctx.beginPath();
+        ctx.moveTo(shift + s * 0.12, -s * 0.22);
+        ctx.lineTo(shift - s * 0.16, 0);
+        ctx.lineTo(shift + s * 0.12, s * 0.22);
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+    const corner = angle => {
+      ctx.save(); ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.22, -s * 0.22); ctx.lineTo(s * 0.22, -s * 0.22); ctx.lineTo(s * 0.22, s * 0.22);
+      ctx.stroke();
+      ctx.restore();
+    };
+    switch (value) {
+      case 1: dots(2, false); break;
+      case 2: arrow(-Math.PI / 2); break;
+      case 3: arrow(Math.PI / 2); break;
+      case 4: corner(0); break;
+      case 5: arrow(0); break;
+      case 6: dot(0, 0, 1.25); break;
+      case 7: dots(2, true); break;
+      case 8: arrow(Math.PI); break;
+      case 9: chevron(0); break;
+      case 10: dots(3, false); break;
+      case 11: dots(3, true); break;
+      case 12: chevron(0, true); break;
+      case 13: chevron(Math.PI / 2); break;
+      case 14: chevron(-Math.PI / 2); break;
+      case 15: corner(Math.PI); break;
+    }
+    ctx.restore();
+  }
+
   function paintTile(x, y, value) {
-    const colour = value % 4 === 0 ? CORAL : value % 4 === 1 ? TEAL : value % 4 === 2 ? GOLD : CREAM;
     roundRect(x + 3, y + 3, TILE - 6, TILE - 6, 9);
-    ctx.fillStyle = colour;
+    ctx.fillStyle = CREAM;
     ctx.fill();
     ctx.save();
     ctx.clip();
-    ctx.fillStyle = TINTS[colour] || CREAM;
-    ctx.fillRect(x + 3, y + 3, TILE - 6, (TILE - 6) * 0.24);
+    ctx.fillStyle = TINTS[GOLD];
+    ctx.fillRect(x + 3, y + 3, TILE - 6, (TILE - 6) * 0.16);
     ctx.restore();
     ctx.lineWidth = 3;
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
-    // Inked notches in the band make tiles read by pattern as well as colour.
-    ctx.fillStyle = colour === CREAM || colour === GOLD ? INK : CREAM;
-    for (let i = 0; i < 2; i++) {
-      ctx.beginPath();
-      ctx.arc(x + 16 + i * 8, y + 13, 1.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = colour === CORAL || colour === TEAL ? CREAM : INK;
-    ctx.font = "700 34px ui-monospace, monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(String(value), x + TILE / 2, y + TILE / 2 + 2);
+    drawMark(value, x + TILE / 2, y + TILE / 2, TILE);
   }
 
   function draw() {
@@ -312,26 +372,23 @@
       ctx.beginPath(); ctx.moveTo(OX, OY + i * TILE + .5); ctx.lineTo(OX + N * TILE, OY + i * TILE + .5); ctx.stroke();
     }
 
+    // The thumbnail's single heavy ink frame around the puzzle.
     roundRect(OX - 7, OY - 7, N * TILE + 14, N * TILE + 14, 12);
-    ctx.fillStyle = GOLD;
+    ctx.fillStyle = CREAM;
     ctx.fill();
-    ctx.save();
-    ctx.clip();
-    ctx.fillStyle = TINTS[GOLD];
-    ctx.fillRect(OX - 7, OY - 7, N * TILE + 14, (N * TILE + 14) * 0.24);
-    ctx.restore();
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
 
+    // One empty slot, a plain sand-coloured square with no mark.
     const bx = (blank % N) * TILE, by = Math.floor(blank / N) * TILE;
     roundRect(bx + 4, by + 4, TILE - 8, TILE - 8, 9);
-    ctx.fillStyle = PAPER;
+    ctx.fillStyle = TINTS[GOLD];
     ctx.fill();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = TEAL;
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
     ctx.setLineDash([]);
 

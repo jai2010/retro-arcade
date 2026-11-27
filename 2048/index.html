@@ -512,22 +512,24 @@
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
   const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
   const CORAL_LT = "#f0a17f", TEAL_LT = "#75bdb2", GOLD_LT = "#f2cf7a";
-  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT };
+  // The blue tile matches the fourth tile of the thumbnail.
+  const BLUE = "#4d7bb0", BLUE_LT = "#7ba3cc";
+  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT, [BLUE]: BLUE_LT };
 
-  // Tile tiers carry palette colour plus a small ink mark, so value groups read
-  // at a glance while the printed number still gives the exact value.
+  // Tile tiers carry the thumbnail's flat fills: coral, teal, gold and blue,
+  // with cream and lighter tints for the higher values.
   const TILES = {
-    2:    { fill: CREAM,    text: INK,   mark: "dot" },
-    4:    { fill: GOLD_LT,  text: INK,   mark: "dot" },
-    8:    { fill: GOLD,     text: CREAM, mark: "bar" },
-    16:   { fill: GOLD,     text: CREAM, mark: "bar" },
-    32:   { fill: TEAL_LT,  text: INK,   mark: "bar" },
-    64:   { fill: TEAL,     text: CREAM, mark: "dot" },
-    128:  { fill: TEAL,     text: CREAM, mark: "dot" },
-    256:  { fill: CORAL_LT, text: INK,   mark: "bar" },
-    512:  { fill: CORAL,    text: CREAM, mark: "dot" },
-    1024: { fill: CORAL,    text: CREAM, mark: "dot" },
-    2048: { fill: INK,      text: GOLD,  mark: "diamond" }
+    2:    { fill: CORAL,    text: CREAM },
+    4:    { fill: TEAL,     text: CREAM },
+    8:    { fill: GOLD,     text: CREAM },
+    16:   { fill: BLUE,     text: CREAM },
+    32:   { fill: CORAL_LT, text: INK },
+    64:   { fill: TEAL_LT,  text: INK },
+    128:  { fill: GOLD_LT,  text: INK },
+    256:  { fill: BLUE_LT,  text: INK },
+    512:  { fill: CORAL,    text: CREAM },
+    1024: { fill: TEAL,     text: CREAM },
+    2048: { fill: GOLD,     text: INK }
   };
 
   let W = 400, H = 400;
@@ -686,46 +688,47 @@
     ctx.closePath();
   }
 
-  // Flat palette fill, thick ink outline and a lighter top band — the same
-  // construction used by the arcade thumbnail illustrations.
+  // Thumbnail tile: rounded flat fill, ink drop shadow, thick ink edge, a
+  // lighter top band and a small curved highlight in the top-left corner.
   function drawTile(value, x, y, size) {
     const inset = size * 0.06;
     const style = TILES[value] || TILES[2048];
     const tx = x + inset, ty = y + inset;
     const tw = size - inset * 2, th = size - inset * 2;
-    roundRect(tx, ty, tw, th, size * 0.12);
+    const radius = size * 0.12;
+
+    ctx.save();
+    roundRect(tx + size * 0.025, ty + size * 0.03, tw, th, radius);
+    ctx.fillStyle = "rgba(32,38,43,0.18)";
+    ctx.fill();
+    ctx.restore();
+
+    roundRect(tx, ty, tw, th, radius);
     ctx.fillStyle = style.fill;
     ctx.fill();
     ctx.save();
     ctx.clip();
     ctx.fillStyle = TINTS[style.fill] || CREAM;
     ctx.fillRect(tx, ty, tw, Math.max(3, th * 0.24));
+    ctx.strokeStyle = "rgba(255,253,250,0.9)";
+    ctx.lineWidth = Math.max(2, size * 0.028);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(tx + tw * 0.12, ty + th * 0.2);
+    ctx.quadraticCurveTo(tx + tw * 0.08, ty + th * 0.07, tx + tw * 0.28, ty + th * 0.06);
+    ctx.stroke();
     ctx.restore();
-    ctx.lineWidth = 3;
+    // Rebuild the tile path: the gloss stroke replaced the current path.
+    roundRect(tx, ty, tw, th, radius);
+    ctx.lineWidth = Math.max(3, size * 0.035);
     ctx.lineJoin = "round";
     ctx.strokeStyle = INK;
     ctx.stroke();
 
-    // Small corner marks reinforce the tier without crowding the number.
-    const mx = tx + tw * 0.18, my = ty + th * 0.8;
-    ctx.fillStyle = style.text;
-    ctx.strokeStyle = style.text;
-    ctx.lineWidth = 2;
-    if (style.mark === "dot") {
-      ctx.beginPath(); ctx.arc(mx, my, Math.max(2, size * 0.045), 0, Math.PI * 2); ctx.fill();
-    } else if (style.mark === "bar") {
-      ctx.beginPath(); ctx.moveTo(mx - size * 0.07, my); ctx.lineTo(mx + size * 0.07, my); ctx.stroke();
-    } else if (style.mark === "diamond") {
-      const d = Math.max(3, size * 0.06);
-      ctx.beginPath();
-      ctx.moveTo(mx, my - d); ctx.lineTo(mx + d, my); ctx.lineTo(mx, my + d); ctx.lineTo(mx - d, my);
-      ctx.closePath(); ctx.fill();
-    }
-
     const digits = String(value).length;
     const fontSize = size * (digits <= 3 ? 0.42 : digits === 4 ? 0.32 : 0.25);
     ctx.fillStyle = style.text;
-    ctx.font = "700 " + fontSize + "px monospace";
+    ctx.font = "800 " + fontSize + "px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(value), x + size / 2, y + size / 2 + fontSize * 0.04);

@@ -897,23 +897,41 @@
   }
 
   function drawPaddle(x, yCenter, color) {
-    const r = Math.min(6, padW / 2);
+    const r = padW / 2;
     const top = yCenter - padH / 2;
+    // The thumbnail paddles cast a soft ink shadow down and to the right.
+    const shadow = new Path2D();
+    roundRectPath(shadow, x + Math.max(2, padW * 0.35), top + Math.max(2, padW * 0.35), padW, padH, r);
+    ctx.save();
+    ctx.fillStyle = "rgba(32,38,43,0.18)";
+    ctx.fill(shadow);
+    ctx.restore();
+
+    // Rounded pill body with a lighter top band and a heavy ink edge.
     const path = new Path2D();
     roundRectPath(path, x, top, padW, padH, r);
-    inkedShape(path, color, { x, y: top, w: padW, h: Math.max(2, padH * 0.24) }, 3);
-    // A cream mark on each paddle keeps the two sides distinct beyond colour.
+    inkedShape(path, color, { x, y: top, w: padW, h: Math.max(2, padH * 0.22) }, Math.max(3, padW * 0.45));
+
+    // Cream highlight streak near the top of each illustrated paddle.
+    ctx.save();
+    ctx.fillStyle = CREAM;
+    ctx.beginPath();
+    ctx.ellipse(x + padW / 2, top + padH * 0.1, Math.max(0.9, padW * 0.16), Math.max(2, padH * 0.045), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // A small mark keeps the coral and teal sides distinct beyond colour.
     ctx.fillStyle = CREAM;
     ctx.strokeStyle = INK;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.2;
     if (color === CORAL) {
       ctx.beginPath();
-      ctx.arc(x + padW / 2, yCenter, Math.max(1.6, padW * 0.22), 0, Math.PI * 2);
+      ctx.arc(x + padW / 2, yCenter, Math.max(1.2, padW * 0.19), 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     } else {
-      ctx.fillRect(x, yCenter - 1, padW, 2);
-      ctx.strokeRect(x, yCenter - 1, padW, 2);
+      ctx.fillRect(x + padW * 0.2, yCenter - 1, padW * 0.6, 2);
+      ctx.strokeRect(x + padW * 0.2, yCenter - 1, padW * 0.6, 2);
     }
   }
 
@@ -939,27 +957,57 @@
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
 
-    // Half-court line and centre ring: faint ink gauges on solid paper.
-    ctx.strokeStyle = "rgba(32,38,43,0.10)";
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([8, 10]);
+    // Dotted centre line and centre ring, drawn in soft ink like the thumbnail.
+    ctx.save();
+    ctx.strokeStyle = "rgba(32,38,43,0.62)";
+    ctx.lineWidth = Math.max(3, W * 0.012);
+    ctx.lineCap = "round";
+    ctx.setLineDash([Math.max(10, H * 0.075), Math.max(8, H * 0.055)]);
     ctx.beginPath();
-    ctx.moveTo(W / 2 + 0.5, 0);
-    ctx.lineTo(W / 2 + 0.5, H);
+    ctx.moveTo(W / 2, 0);
+    ctx.lineTo(W / 2, H);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineWidth = Math.max(2, W * 0.008);
     ctx.beginPath();
     ctx.arc(W / 2, H / 2, Math.max(14, W * 0.07), 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
 
     drawPaddle(padX, playerY, CORAL);
     drawPaddle(W - padX - padW, aiY, TEAL);
 
+    // Three quick strokes trail the ball, as in the illustrated thumbnail.
+    if (started && !awaitingServe && !paused) {
+      const sign = ball.vx >= 0 ? -1 : 1;
+      ctx.save();
+      ctx.strokeStyle = "rgba(32,38,43,0.24)";
+      ctx.lineWidth = Math.max(1.5, ballR * 0.18);
+      ctx.lineCap = "round";
+      for (const off of [-ballR * 0.55, 0, ballR * 0.55]) {
+        ctx.beginPath();
+        ctx.moveTo(ball.x + sign * ballR * 1.35, ball.y + off - sign);
+        ctx.lineTo(ball.x + sign * ballR * 2.5, ball.y + off + sign * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Cream ball with a gold two-tone tint and a heavy ink edge.
     const ballPath = new Path2D();
     ballPath.arc(ball.x, ball.y, ballR, 0, Math.PI * 2);
-    inkedShape(ballPath, GOLD, {
-      x: ball.x - ballR, y: ball.y - ballR, w: ballR * 2, h: Math.max(2, ballR * 0.9)
-    }, 2);
+    inkedShape(ballPath, CREAM, null, Math.max(2, ballR * 0.3));
+    ctx.save();
+    ctx.clip(ballPath);
+    ctx.fillStyle = TINTS[GOLD];
+    ctx.beginPath();
+    ctx.arc(ball.x + ballR * 0.2, ball.y + ballR * 0.18, ballR * 0.78, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = CREAM;
+    ctx.beginPath();
+    ctx.arc(ball.x - ballR * 0.3, ball.y - ballR * 0.3, Math.max(1, ballR * 0.22), 0, Math.PI * 2);
+    ctx.fill();
 
     if (roundOver) {
       drawOverlay(scoreYou > scoreAi ? "You win the round" : "AI wins the round",

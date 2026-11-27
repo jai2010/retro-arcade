@@ -76,6 +76,13 @@
   html.no-touch-pad .gesture-tip.is-open{display:flex}
   .tip-close{flex:0 0 auto;width:30px;height:30px;padding:0;border:1px solid rgba(128,128,128,.35);border-radius:50%;background:transparent;color:inherit;font:18px/1 monospace;cursor:pointer}
   @media(max-height:520px) and (pointer:coarse){html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 140px) * 0.7600))!important}}
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
 </style>
 </head>
 <body>
@@ -378,21 +385,31 @@
       ctx.stroke();
       return;
     }
-    // Teal blocks with a lighter top band and gold window marks.
-    const blocks = [[-13, 12, 8], [-4, 20, 7], [4, 15, 9]];
-    for (const [dx, h, w] of blocks) {
-      const bx = c.x + dx;
-      ctx.fillStyle = TEAL;
-      ctx.fillRect(bx, y - h, w, h);
-      ctx.fillStyle = TINTS[TEAL];
-      ctx.fillRect(bx, y - h, w, 3);
+    // Teal and dark-navy skyline blocks with small cream windows.
+    const blocks = [
+      { dx: -14, h: 14, w: 9, dark: false },
+      { dx: -5, h: 22, w: 8, dark: true },
+      { dx: 4, h: 17, w: 9, dark: false }
+    ];
+    for (const b of blocks) {
+      const bx = c.x + b.dx;
+      ctx.fillStyle = b.dark ? INK : TEAL;
+      ctx.fillRect(bx, y - b.h, b.w, b.h);
+      if (!b.dark) {
+        ctx.fillStyle = TINTS[TEAL];
+        ctx.fillRect(bx, y - b.h, b.w, 3);
+      }
       ctx.lineWidth = 2; ctx.strokeStyle = INK;
-      ctx.strokeRect(bx, y - h, w, h);
-      ctx.fillStyle = GOLD;
-      for (let wy = y - h + 6; wy < y - 3; wy += 7) {
-        ctx.fillRect(bx + 2, wy, 2, 2); ctx.fillRect(bx + w - 4, wy, 2, 2);
+      ctx.strokeRect(bx, y - b.h, b.w, b.h);
+      ctx.fillStyle = b.dark ? TEAL : CREAM;
+      for (let wy = y - b.h + 6; wy < y - 3; wy += 7) {
+        ctx.fillRect(bx + 2, wy, 2, 3); ctx.fillRect(bx + b.w - 4, wy, 2, 3);
       }
     }
+    // Antenna on the tallest tower.
+    ctx.beginPath();
+    ctx.moveTo(c.x - 1, y - 22); ctx.lineTo(c.x - 1, y - 28);
+    ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
   }
   function drawBase(b) {
     const y = H - 12;
@@ -404,20 +421,18 @@
     // Lighter inset band along the top edge of the silo.
     ctx.beginPath(); ctx.moveTo(b.x - 6, y - 6); ctx.lineTo(b.x + 6, y - 6);
     ctx.lineWidth = 3; ctx.strokeStyle = TINTS[TEAL]; ctx.stroke();
-    ctx.fillStyle = GOLD;
-    for (let i = 0; i < b.ammo; i++) {
-      ctx.fillRect(b.x - 11 + i * 2.3, y - 4, 1.6, 5);
+    ctx.fillStyle = CREAM;
+    for (let i = 0; i < Math.min(b.ammo, 8); i++) {
+      ctx.fillRect(b.x - 9 + i * 2.4, y - 4, 1.8, 5);
     }
   }
+  // Round coral dots trace each arc, as in the thumbnail.
   function drawTrail(m, color) {
-    if (!m.trail.length) return;
-    ctx.beginPath(); ctx.moveTo(m.trail[0].x, m.trail[0].y);
-    for (const p of m.trail) ctx.lineTo(p.x, p.y);
-    ctx.lineTo(m.x, m.y); ctx.lineWidth = 3;
-    ctx.strokeStyle = color; ctx.lineCap = "round";
-    ctx.setLineDash([1, 6]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    for (const p of m.trail) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(m.x, m.y, 2.2, 0, Math.PI * 2); ctx.fill();
   }
   function drawBlast(b) {
     // An eight-point gold starburst with a lighter inset star, like the thumbnail.
@@ -431,10 +446,10 @@
       }
       ctx.closePath();
     };
-    star(b.r, b.r * 0.45);
+    star(b.r, b.r * 0.37);
     ctx.fillStyle = GOLD; ctx.fill();
     ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = INK; ctx.stroke();
-    star(b.r * 0.58, b.r * 0.26);
+    star(b.r * 0.56, b.r * 0.22);
     ctx.fillStyle = TINTS[GOLD]; ctx.fill();
   }
   function drawReticle() {
@@ -470,11 +485,21 @@
     bases.forEach(drawBase);
     incoming.forEach(m => {
       drawTrail(m, CORAL);
-      ctx.beginPath(); ctx.moveTo(m.x, m.y - 5);
-      ctx.lineTo(m.x + 4, m.y + 5); ctx.lineTo(m.x - 4, m.y + 5);
-      ctx.closePath(); ctx.fillStyle = CORAL;
-      ctx.fill(); ctx.lineWidth = 3; ctx.lineJoin = "round";
-      ctx.strokeStyle = INK; ctx.stroke();
+      // Small coral rocket, nose pointing along its flight path.
+      ctx.save();
+      ctx.translate(m.x, m.y);
+      ctx.rotate(Math.atan2(m.vx, -m.vy));
+      ctx.beginPath();
+      ctx.moveTo(0, -7);
+      ctx.quadraticCurveTo(4, -2, 3, 5);
+      ctx.lineTo(-3, 5);
+      ctx.quadraticCurveTo(-4, -2, 0, -7);
+      ctx.closePath();
+      ctx.fillStyle = CORAL; ctx.fill();
+      ctx.lineWidth = 2.5; ctx.lineJoin = "round"; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-3, 2); ctx.lineTo(3, 2);
+      ctx.lineWidth = 1.5; ctx.strokeStyle = CREAM; ctx.stroke();
+      ctx.restore();
     });
     outgoing.forEach(m => {
       drawTrail(m, TEAL);

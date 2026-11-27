@@ -654,33 +654,28 @@
     accentDark: INK, teal: TEAL, amber: GOLD, blue: TEAL,
     sand: PAPER, line: INK, surface: CREAM, board: PAPER
   };
-  // Four alien ranks: palette colours plus a rank mark, never colour alone.
-  const ALIEN_COLORS = [CORAL, GOLD, TEAL, CORAL];
+  // Four ranks in the thumbnail's coral / teal / gold order. Each rank has its
+  // own silhouette (squid, crab, octopus) plus a rank mark, never colour alone.
+  const ALIEN_COLORS = [CORAL, TEAL, GOLD, CORAL];
 
-  // Small pixel sprites, drawn as filled cells in world units.
-  const ALIEN_FRAMES = [
-    [
-      "00111100",
-      "01111110",
-      "11011011",
-      "11111111",
-      "00100100"
+  // Pixel sprites drawn as filled 3px cells, two march frames per silhouette.
+  const ALIEN_SPRITES = [
+    [ // squid: antennae, wide head, splayed legs
+      ["01000010", "00111100", "01111110", "11011011", "10100101"],
+      ["01000010", "00111100", "01111110", "11011011", "01011010"]
     ],
-    [
-      "00111100",
-      "01111110",
-      "11011011",
-      "11111111",
-      "01000010"
+    [ // crab: outstretched claws and two little legs
+      ["00111100", "11111111", "11011011", "01111110", "01000010"],
+      ["00111100", "11111111", "11011011", "01111110", "10000001"]
+    ],
+    [ // octopus: round head and wavy tentacles
+      ["01111110", "11111111", "11011011", "11111111", "01100110"],
+      ["01111110", "11111111", "11011011", "11111111", "10011001"]
+    ],
+    [ // rear guard: squid silhouette again
+      ["01000010", "00111100", "01111110", "11011011", "10100101"],
+      ["01000010", "00111100", "01111110", "11011011", "01011010"]
     ]
-  ];
-
-  const SHIP_SPRITE = [
-    "000010000",
-    "000111000",
-    "001111100",
-    "011111110",
-    "111111111"
   ];
 
   const SHIELD_SHAPE = [
@@ -1177,12 +1172,10 @@
     return { body, outline };
   }
 
-  const ALIEN_PATHS = ALIEN_FRAMES.map(frame =>
-    gridPaths(frame[0].length, frame.length, 3, 0, 0, (r, c) => !!frame[r] && frame[r][c] === "1"));
-  const SHIP_PATH = gridPaths(SHIP_SPRITE[0].length, SHIP_SPRITE.length, 3, 0, 0,
-    (r, c) => !!SHIP_SPRITE[r] && SHIP_SPRITE[r][c] === "1");
+  const ALIEN_PATHS = ALIEN_SPRITES.map(frames => frames.map(frame =>
+    gridPaths(frame[0].length, frame.length, 3, 0, 0,
+      (r, c) => !!frame[r] && frame[r][c] === "1")));
   const ALIEN_BAND = { x: 0, y: 0, w: 24, h: 4 };
-  const SHIP_BAND = { x: 0, y: 0, w: 27, h: 3.5 };
 
   // Rank marks: dots and dashes, so alien types read without relying on colour.
   function alienRankMark(row) {
@@ -1204,6 +1197,50 @@
       ctx.lineTo(row === 1 ? 15 : 19, y);
       ctx.stroke();
     }
+  }
+
+  function polyPath(points) {
+    const p = new Path2D();
+    p.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) p.lineTo(points[i][0], points[i][1]);
+    p.closePath();
+    return p;
+  }
+
+  // The thumbnail's little ship: coral wings and engine pods around a cream
+  // fuselage with a coral nose, a teal canopy and a dark landing skid.
+  function drawShip() {
+    ctx.save();
+    ctx.translate(player.x - PLAYER_W / 2, PLAYER_Y);
+
+    const wingL = polyPath([[0.5, 15], [4.5, 8], [11, 13], [11, 15]]);
+    const wingR = polyPath([[26.5, 15], [22.5, 8], [16, 13], [16, 15]]);
+    inkedFill(wingL, CORAL, { x: 0, y: 8, w: 11, h: 4 }, wingL, 1.8);
+    inkedFill(wingR, CORAL, { x: 16, y: 8, w: 11, h: 4 }, wingR, 1.8);
+
+    const pods = new Path2D();
+    roundRectPath(pods, 0.8, 11.4, 4.2, 3.6, 1.4);
+    roundRectPath(pods, 22, 11.4, 4.2, 3.6, 1.4);
+    inkedFill(pods, TINTS[CORAL], null, pods, 1.6);
+
+    const body = polyPath([[13.5, 0], [18.5, 6], [17.5, 15], [9.5, 15], [8.5, 6]]);
+    inkedFill(body, CREAM, null, body, 2);
+    const nose = polyPath([[13.5, 0], [16.2, 4.4], [10.8, 4.4]]);
+    inkedFill(nose, CORAL, { x: 11, y: 0, w: 5, h: 1.6 }, nose, 1.8);
+
+    const canopy = new Path2D();
+    roundRectPath(canopy, 11.4, 5.4, 4.2, 4.6, 1.6);
+    inkedFill(canopy, TEAL, { x: 11.4, y: 5.4, w: 4.2, h: 1.7 }, canopy, 1.6);
+    ctx.beginPath();
+    ctx.arc(12.5, 6.8, 0.8, 0, Math.PI * 2);
+    ctx.fillStyle = CREAM;
+    ctx.fill();
+
+    const skid = new Path2D();
+    roundRectPath(skid, 8.5, 13.6, 10, 2, 1);
+    ctx.fillStyle = INK;
+    ctx.fill(skid);
+    ctx.restore();
   }
 
   function draw() {
@@ -1245,45 +1282,21 @@
       }, shape.outline);
     }
 
-    // Alien formation with a two-frame march and a rank mark per row.
+    // Alien formation: each rank keeps its own two-frame silhouette.
     const frame = Math.abs(Math.floor(animTime / 340)) % 2;
     for (const a of aliens) {
       if (!a.alive) continue;
       ctx.save();
       ctx.translate(alienX(a), alienY(a));
-      const art = ALIEN_PATHS[frame];
-      inkedFill(art.body, a.color, ALIEN_BAND, art.outline);
+      const art = ALIEN_PATHS[a.row][frame];
+      inkedFill(art.body, a.color, ALIEN_BAND, art.outline, 1.8);
       alienRankMark(a.row);
       ctx.restore();
     }
 
     // Player ship, blinking briefly after a hit.
     const visible = invuln <= 0 || Math.floor(invuln * 9) % 2 === 0;
-    if (visible) {
-      ctx.save();
-      ctx.translate(player.x - PLAYER_W / 2, PLAYER_Y);
-      inkedFill(SHIP_PATH.body, CORAL, SHIP_BAND, SHIP_PATH.outline);
-      const wings = new Path2D();
-      roundRectPath(wings, 0.6, 12.5, 5, 2, 1);
-      roundRectPath(wings, 21.4, 12.5, 5, 2, 1);
-      ctx.fillStyle = TEAL;
-      ctx.fill(wings);
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = 2;
-      ctx.lineJoin = "round";
-      ctx.stroke(wings);
-      const canopy = new Path2D();
-      roundRectPath(canopy, 10.5, 3.6, 6, 5.4, 2);
-      ctx.fillStyle = GOLD;
-      ctx.fill(canopy);
-      ctx.strokeStyle = INK;
-      ctx.stroke(canopy);
-      ctx.beginPath();
-      ctx.arc(13.5, 6.3, 1.2, 0, Math.PI * 2);
-      ctx.fillStyle = CREAM;
-      ctx.fill();
-      ctx.restore();
-    }
+    if (visible) drawShip();
 
     // Projectiles: rounded capsules with ink outlines and a lighter top band.
     for (const b of bullets) {
