@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rally Run</title>
+<style>
+  :root { --paper:#f7f4ee; --ink:#20262b; --muted:rgba(32,38,43,.62); --accent:#e5724c; --accent-dark:#20262b; --teal:#3f9b91; --sand:#ede7dc; --line:#ede7dc; --surface:#fffdfa; --radius:12px; --radius-sm:8px; --retro-font:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background-color:var(--paper);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.05'/%3E%3C/svg%3E");color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;overflow:hidden}
+  .shell{--board-w:min(calc((100dvh - 170px) * 0.7600),620px);--side-w:270px;--gap:clamp(12px,2vw,24px);--content-w:calc(var(--board-w) + var(--gap) + var(--side-w));height:100dvh;max-width:1080px;margin:0 auto;padding:clamp(10px,1.8vh,22px) clamp(14px,2vw,30px) clamp(10px,1.6vh,18px);display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:clamp(8px,1.4vh,16px)}
+  header.top,.game{width:min(100%,var(--content-w));margin-inline:auto}
+  header.top{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+  h1{margin:0;font-size:clamp(24px,3.4vw,38px);letter-spacing:-.02em;line-height:1.15}
+  .tagline{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  button{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius-sm);box-shadow:0 2px 0 rgba(32,38,43,.18);padding:8px 14px;min-height:44px;cursor:pointer;transition:transform 120ms ease,box-shadow 120ms ease,border-color 120ms ease,background 120ms ease}
+  button:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(32,38,43,0.10);border-color:var(--teal)}
+  button:active{transform:translateY(1px);box-shadow:none}
+  button.primary{background:var(--accent);border-color:var(--ink);color:#fffdfa}
+  button.primary:hover{background:var(--accent-dark)}
+  .actions a.back{display:inline-flex;align-items:center;justify-content:center;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius-sm);box-shadow:0 2px 0 rgba(32,38,43,.18);padding:8px 14px;min-height:44px;text-decoration:none;transition:transform 120ms ease,box-shadow 120ms ease,border-color 120ms ease}
+  .actions a.back:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(32,38,43,0.10);border-color:var(--teal)}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .game{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,var(--board-w)) var(--side-w);gap:var(--gap);align-items:center}
+  .play{display:flex;flex-direction:column;gap:clamp(6px,1vh,10px);min-height:0;width:var(--board-w)}
+  .board-width{width:var(--board-w)}
+  .hud{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius)}
+  .score-block{display:flex;align-items:baseline;gap:8px}
+  .score-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+  #score{font-size:clamp(24px,3.2vh,36px);line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .chip{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--sand);border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .chip b{color:var(--ink);font-variant-numeric:tabular-nums} .chip.best b{color:var(--accent)}
+  .board-wrap{position:relative;aspect-ratio:342/450;background:var(--sand);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 10px 24px rgba(32,38,43,0.14);padding:8px}
+  canvas.board{display:block;width:100%;height:100%;border-radius:var(--radius-sm);background:#fffdfa;touch-action:none;}
+  .side{width:100%;display:flex;flex-direction:column;gap:clamp(8px,1.3vh,14px);max-height:calc(100dvh - 120px);overflow-y:auto;padding-right:2px}
+  .panel{background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 6px 16px rgba(32,38,43,0.10);padding:clamp(9px,1.3vh,14px)}
+  .panel h2{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .legend{font-size:12px} .legend div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+  kbd{font:inherit;font-size:11px;background:var(--sand);border:2px solid var(--ink);border-bottom-width:2px;border-radius:5px;padding:1px 5px;white-space:nowrap}
+  .help,.hint,.record{margin:0;color:var(--muted);font-size:12px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media(max-width:760px){body{overflow:auto}.shell{height:auto;min-height:100dvh}header.top,.game{width:100%}header.top{align-items:flex-start;flex-direction:column}.game{grid-template-columns:1fr;align-items:start}.play{width:100%}.board-width{width:min(100%,calc((100dvh - 220px) * 0.7600)) !important;margin-inline:auto}.play .hud{width:100%}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none;overflow:visible}.side .panel:last-child{grid-column:1/-1}}
+  @media(max-height:620px) and (min-width:761px){.tagline{display:none}h1{font-size:24px}.side{gap:6px}.panel{padding:8px}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0.01ms!important}}
+  /* Shared arcade header and retro typography */
+  body{font-family:var(--retro-font);font-size:13px}
+  header,header.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-direction:row!important;align-items:center!important;min-height:52px;padding-bottom:10px;border-bottom:2px solid var(--ink)}
+  header h1{font-family:var(--retro-font);font-size:24px;line-height:1;text-transform:uppercase;letter-spacing:.08em;margin:0}
+  header .tagline{margin:4px 0 0;font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44ch;text-transform:uppercase;letter-spacing:.05em}
+  header .actions{flex-wrap:nowrap}
+  .panel h2,.chip,.score-label,kbd,.keys,.name,.title,.desc{font-family:var(--retro-font);letter-spacing:.05em}
+  .panel h2,.chip,.score-label,.keys{text-transform:uppercase}
+  button,.actions a.back{font-family:var(--retro-font);text-transform:uppercase;letter-spacing:.05em;font-size:12px}
+  /* Arcade lighting: shared with the home page */
+  body[data-theme="dark"]{--paper:#171b1e;--ink:#f7f4ee;--muted:#aab2b7;--line:rgba(247,244,238,.22);--surface:#20262b;--sand:#2b3237}
+  body{background-color:var(--paper);background-image:radial-gradient(circle at 50% -10%,rgba(229,114,76,.10),transparent 60%),radial-gradient(rgba(128,128,128,.055) .7px,transparent .7px);background-size:auto,6px 6px;transition:background-color 200ms ease,color 200ms ease}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;background:repeating-linear-gradient(180deg,rgba(128,128,128,.035) 0 1px,transparent 1px 4px)}
+  .shell{position:relative;z-index:1}
+  .joystick{width:44px;height:44px;min-height:44px;padding:0;border-radius:50%;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;cursor:pointer;text-transform:none}
+  .joystick .stick{display:block;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid rgba(32,38,43,.65);transform:translateY(-5px);transition:transform 180ms ease}
+  .joystick[aria-checked="true"] .stick{transform:translateY(5px)} .joystick:hover{border-color:var(--accent)}
+  /* Phone-first play: no keyboard prompts and no button panels. */
+  @media(max-width:760px){header .tagline{display:none!important}header h1{font-size:18px!important}.actions{flex-wrap:nowrap!important;justify-content:flex-end!important;gap:4px!important}.actions button,.actions a.back{min-height:36px!important;padding:5px 7px!important;font-size:10px!important}.joystick{width:40px!important;height:40px!important;min-height:40px!important}.hud{padding:6px 10px!important;gap:6px!important}.chip{font-size:10px!important;padding:3px 7px!important}.legend,.help,.hint{display:none!important}.shell{padding-bottom:24px!important}}
+  /* Phone layout: fit the board to the viewport; draw the rest from the canvas. */
+  .gesture-tip{display:none}
+  html.no-touch-pad .shell{max-width:none!important;padding:8px 4px 14px!important}
+  html.no-touch-pad header,html.no-touch-pad .game{width:100%!important;max-width:none!important}
+  html.no-touch-pad .game{grid-template-columns:1fr!important;grid-template-rows:1fr!important;align-items:stretch!important}
+  html.no-touch-pad .play{width:100%!important;height:100%;justify-content:flex-start}
+  html.no-touch-pad .play .hud{width:100%!important}
+  html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 170px) * 0.7600))!important;margin-inline:auto!important}
+  html.no-touch-pad .side{display:none!important}
+  html.no-touch-pad .gesture-tip{display:none;position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;align-items:center;gap:12px;width:min(92vw,420px);max-width:min(92vw,420px);padding:9px 10px 9px 14px;border:1px solid rgba(128,128,128,.35);border-radius:14px;background:var(--surface,#fffdfa);box-shadow:0 8px 24px rgba(0,0,0,.25);color:var(--muted,currentColor);font:12px/1.35 var(--retro-font,monospace);text-align:center}
+  html.no-touch-pad .gesture-tip.is-open{display:flex}
+  .tip-close{flex:0 0 auto;width:30px;height:30px;padding:0;border:1px solid rgba(128,128,128,.35);border-radius:50%;background:transparent;color:inherit;font:18px/1 monospace;cursor:pointer}
+  @media(max-height:520px) and (pointer:coarse){html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 140px) * 0.7600))!important}}
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
+  @media(max-width:760px){html.no-touch-pad .shell{padding-bottom:4px!important}}
+
+  /* Gesture play: no text selection, callout or highlight while dragging. */
+  html, body, .shell, .play, .board-wrap, canvas, .gesture-tip {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .board-wrap, canvas { touch-action: none; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div>
+      <h1>Rally Run</h1>
+      <p class="tagline">Three laps, two rivals, one winding track.</p>
+    </div>
+    <div class="actions">
+      <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights"><span class="stick" aria-hidden="true"></span></button>
+      <a class="back" href="../index.html" aria-label="Back to arcade">← Arcade</a>
+      <button id="pauseBtn" type="button" aria-pressed="false">Pause</button>
+      <button id="newBtn" class="primary" type="button">New game</button>
+    </div>
+  </header>
+
+  <main class="game">
+    <section class="play" aria-label="Game">
+      <div class="hud board-width" aria-live="polite">
+        <div class="score-block"><span class="score-label">Score</span><strong id="score">0</strong></div>
+        <div class="chips">
+          <span class="chip">Lap <b id="lap">1/3</b></span>
+          <span class="chip">Time <b id="timer">0:00.00</b></span>
+          <span class="chip">Best lap <b id="bestLap">--:--</b></span>
+          <span class="chip best">Best <b id="best">0</b></span>
+        </div>
+      </div>
+
+      <div class="board-wrap board-width">
+        <canvas id="game" class="board" tabindex="0" role="img" aria-label="Rally Run playfield: steer the car around the winding track for three laps">Your browser does not support canvas.</canvas>
+      </div>
+      <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
+        <span>Drag left or right to steer · drag up or tap to boost</span>
+        <button type="button" class="tip-close" aria-label="Close controls tip">×</button>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Instructions">
+      <section class="panel">
+        <h2>Rules</h2>
+        <p class="help">Finish three laps of the winding oval ahead of two rivals. The gold checkered line marks each lap; drifting past the teal track edges slows the car down. Boost fuel is limited and refills when you ease off.</p>
+      </section>
+      <section class="panel">
+        <h2>Controls</h2>
+        <p class="hint">Drag left or right on the board to steer, drag up or tap to boost. Keyboard: ← / → or A / D steer, ↑ / W and Space boost, ↓ / S brake, P pause, R restart.</p>
+      </section>
+    </aside>
+  </main>
+
+  <p id="announce" class="sr-only" aria-live="polite"></p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // Gestures on the playfield must not start a native selection or drag.
+  document.addEventListener("contextmenu", e => {
+    if (e.target.closest && e.target.closest("canvas, .board-wrap")) e.preventDefault();
+  });
+  document.addEventListener("dragstart", e => {
+    if (e.target.closest && e.target.closest("canvas, .board-wrap")) e.preventDefault();
+  });
+
+  // Keyboard play is desktop-only; phones use taps on the board.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
+  // Phones play by gestures on the board, so there are no on-screen buttons.
+  if (phoneMode.matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches)) {
+    document.documentElement.classList.add("no-touch-pad");
+  }
+  const tip = document.getElementById("controlsTip");
+  if (tip) {
+    tip.querySelector(".tip-close").addEventListener("click", () => tip.classList.remove("is-open"));
+    if (document.documentElement.classList.contains("no-touch-pad")) tip.classList.add("is-open");
+  }
+
+  const W = 342;
+  const H = 450;
+  const CX = W / 2;
+  const CY = H / 2;
+  const RX = 110;
+  const RY = 150;
+  const TRACK_W = 44;
+  const N = 420;
+  const LAPS = 3;
+  const KEY = "rallyrun.best.v1";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const CORAL_LT = "#f0a17f", TEAL_LT = "#75bdb2", GOLD_LT = "#f2cf7a";
+  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT };
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const lapEl = document.getElementById("lap");
+  const timerEl = document.getElementById("timer");
+  const bestLapEl = document.getElementById("bestLap");
+  const bestEl = document.getElementById("best");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const announceEl = document.getElementById("announce");
+  const touchPhone = () => document.documentElement.classList.contains("no-touch-pad");
+
+  // A gently wobbling oval: closed, smooth and always inside the board.
+  function trackPoint(t) {
+    const a = t * Math.PI * 2 - Math.PI / 2;
+    const wob = 1 + 0.09 * Math.sin(3 * a) + 0.05 * Math.cos(2 * a);
+    return { x: CX + RX * Math.cos(a) * wob, y: CY + RY * Math.sin(a) * wob };
+  }
+  const pts = [];
+  for (let i = 0; i < N; i++) pts.push(trackPoint(i / N));
+
+  const rivals = [
+    { num: 7, color: TEAL, u: 0.93, speed: 0.138, offset: -9, seed: 0 },
+    { num: 12, color: GOLD, u: 0.97, speed: 0.131, offset: 9, seed: 2.1 }
+  ];
+
+  let player, keys, record, best, bestLap, score, bonus, progress, completedLaps;
+  let elapsed, lapStart, fuelPulse, started, paused, won, lastTime;
+  let activePointer, pointerX, pointerY, pointerTap, steerDrag, boostDrag;
+  let hudLap = "", hudTimer = "", hudBestLap = "";
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function formatTime(s) {
+    if (!Number.isFinite(s)) return "--:--";
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
+    const cs = Math.floor((s % 1) * 100);
+    return mins + ":" + String(secs).padStart(2, "0") + "." + String(cs).padStart(2, "0");
+  }
+
+  function loadRecord() {
+    try {
+      const raw = window.localStorage.getItem(KEY);
+      if (!raw) return { score: 0, lap: 0 };
+      if (/^\d+$/.test(raw)) return { score: Number(raw), lap: 0 };
+      const o = JSON.parse(raw);
+      return {
+        score: Number.isFinite(+o.score) ? Math.max(0, Math.floor(+o.score)) : 0,
+        lap: Number.isFinite(+o.lap) && +o.lap > 0 ? +o.lap : 0
+      };
+    } catch (_) { return { score: 0, lap: 0 }; }
+  }
+  function saveRecord() {
+    try { window.localStorage.setItem(KEY, JSON.stringify({ score: best, lap: bestLap })); } catch (_) {}
+  }
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function announce(text) { announceEl.textContent = text; }
+
+  function reset() {
+    const p = pts[0];
+    const ahead = pts[3];
+    const behind = pts[N - 3];
+    const angle = Math.atan2(ahead.y - behind.y, ahead.x - behind.x);
+    player = { x: p.x, y: p.y, angle: angle, speed: 0, u: 0, dist: 0, fuel: 100 };
+    keys = { left: false, right: false, boost: false, brake: false };
+    progress = 0;
+    completedLaps = 0;
+    bonus = 0;
+    score = 0;
+    elapsed = 0;
+    lapStart = 0;
+    fuelPulse = 0;
+    started = false;
+    paused = false;
+    won = false;
+    activePointer = null;
+    steerDrag = 0;
+    boostDrag = false;
+    pointerTap = false;
+    rivals[0].u = 0.93;
+    rivals[1].u = 0.97;
+    pauseBtn.textContent = "Pause";
+    pauseBtn.setAttribute("aria-pressed", "false");
+    updateScore();
+    updateHud();
+    placeRivals(0);
+    announce("New race");
+    canvas.focus({ preventScroll: true });
+  }
+
+  function startRace() {
+    if (started || won) return;
+    started = true;
+    announce("Race started");
+  }
+
+  function togglePause() {
+    if (!started || won) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    pauseBtn.setAttribute("aria-pressed", String(paused));
+    announce(paused ? "Paused" : "Resumed");
+  }
+
+  function updateScore() {
+    const value = Math.floor(progress * 100) + bonus;
+    if (value === score) return;
+    score = value;
+    if (score > best) {
+      best = score;
+      saveRecord();
+    }
+    scoreEl.textContent = String(score);
+    bestEl.textContent = String(best);
+  }
+
+  function updateHud() {
+    const lapText = Math.min(LAPS, completedLaps + 1) + "/" + LAPS;
+    const timerText = formatTime(elapsed);
+    const bestText = bestLap ? formatTime(bestLap) : "--:--";
+    if (lapText !== hudLap) { hudLap = lapText; lapEl.textContent = lapText; }
+    if (timerText !== hudTimer) { hudTimer = timerText; timerEl.textContent = timerText; }
+    if (bestText !== hudBestLap) { hudBestLap = bestText; bestLapEl.textContent = bestText; }
+  }
+
+  // Project a world position onto the centreline: distance and lap fraction.
+  function nearest(x, y) {
+    let bestI = 0, bestLocal = 0, bestD2 = Infinity;
+    for (let i = 0; i < N; i++) {
+      const a = pts[i], b = pts[(i + 1) % N];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy || 1;
+      const t = clamp(((x - a.x) * dx + (y - a.y) * dy) / len2, 0, 1);
+      const px = a.x + dx * t, py = a.y + dy * t;
+      const d2 = (x - px) * (x - px) + (y - py) * (y - py);
+      if (d2 < bestD2) { bestD2 = d2; bestI = i; bestLocal = t; }
+    }
+    return { i: bestI, u: (bestI + bestLocal) / N, dist: Math.sqrt(bestD2) };
+  }
+
+  function tangentAt(u) {
+    const a = trackPoint((u - 0.003 + 1) % 1);
+    const b = trackPoint((u + 0.003) % 1);
+    return Math.atan2(b.y - a.y, b.x - a.x);
+  }
+
+  function placeRivals(dt) {
+    for (const r of rivals) {
+      if (started && !paused && !won) r.u = (r.u + r.speed * dt) % 1;
+      const p = trackPoint(r.u);
+      const ang = tangentAt(r.u);
+      const wob = r.offset + 3 * Math.sin(elapsed * 1.1 + r.seed);
+      r.x = p.x - Math.sin(ang) * wob;
+      r.y = p.y + Math.cos(ang) * wob;
+      r.angle = ang;
+    }
+  }
+
+  function update(dt) {
+    if (!started || paused || won) { placeRivals(0); return; }
+    elapsed += dt;
+    fuelPulse = Math.max(0, fuelPulse - dt);
+
+    const steering = clamp((keys.right ? 1 : 0) - (keys.left ? 1 : 0) + steerDrag, -1, 1);
+    const offTrack = player.dist > TRACK_W / 2;
+    const boosting = (keys.boost || boostDrag || fuelPulse > 0) && player.fuel > 0 && !offTrack;
+    if (boosting) player.fuel = Math.max(0, player.fuel - 30 * dt);
+    else player.fuel = Math.min(100, player.fuel + 13 * dt);
+
+    let target = offTrack ? 48 : (boosting ? 196 : 112);
+    if (keys.brake) target = 42;
+    player.speed += (target - player.speed) * Math.min(1, dt * (offTrack ? 5 : 3.2));
+    player.angle += steering * 2.5 * Math.min(1, 0.45 + player.speed / 150) * dt;
+    player.x += Math.cos(player.angle) * player.speed * dt;
+    player.y += Math.sin(player.angle) * player.speed * dt;
+
+    const near = nearest(player.x, player.y);
+    player.dist = near.dist;
+    let du = near.u - player.u;
+    if (du < -0.5) du += 1;
+    if (du > 0.5) du -= 1;
+    if (du > 0 && du < 0.05) progress += du;
+    player.u = near.u;
+
+    // A long excursion into the rough puts the car back on the asphalt.
+    if (player.dist > 92) {
+      const back = pts[near.i];
+      player.x = back.x;
+      player.y = back.y;
+      player.angle = tangentAt(near.i / N);
+      player.speed = 60;
+      player.u = near.i / N;
+      player.dist = 0;
+    }
+
+    const lapsDone = Math.floor(progress);
+    if (lapsDone > completedLaps) {
+      for (let l = completedLaps; l < lapsDone; l++) {
+        const lapTime = elapsed - lapStart;
+        lapStart = elapsed;
+        if (!bestLap || lapTime < bestLap) bestLap = lapTime;
+        bonus += 500 + Math.max(0, Math.round(400 - lapTime * 15));
+      }
+      completedLaps = lapsDone;
+      announce("Lap " + Math.min(LAPS, completedLaps) + " complete");
+      if (completedLaps >= LAPS) {
+        won = true;
+        bonus += Math.max(0, Math.round(1500 - elapsed * 10));
+        saveRecord();
+        announce("Race won in " + formatTime(elapsed));
+      }
+    }
+
+    updateScore();
+    updateHud();
+    placeRivals(dt);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
+  function paintShape(x, y, w, h, r, color) {
+    roundRect(x, y, w, h, r);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(x, y, w, Math.max(2, h * 0.24));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  function paintEllipse(cx, cy, rx, ry, color) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(cx - rx, cy - ry, rx * 2, Math.max(2, ry * 0.9));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  function drawTrack() {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < N; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = TRACK_W + 10;
+    ctx.stroke();
+    ctx.strokeStyle = TEAL;
+    ctx.lineWidth = TRACK_W + 5;
+    ctx.stroke();
+    ctx.strokeStyle = CREAM;
+    ctx.lineWidth = TRACK_W;
+    ctx.stroke();
+    ctx.save();
+    ctx.setLineDash([7, 13]);
+    ctx.strokeStyle = GOLD_LT;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Gold checkered start/finish band, square to the track direction.
+  function drawFinish() {
+    const p = pts[0];
+    const ang = tangentAt(0);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(ang);
+    const cols = 2, rows = 8, cw = 5, ch = TRACK_W / rows;
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) {
+        ctx.fillStyle = (c + r) % 2 === 0 ? GOLD : INK;
+        ctx.fillRect(-cols * cw / 2 + c * cw, -TRACK_W / 2 + r * ch, cw, ch);
+      }
+    }
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-cols * cw / 2, -TRACK_W / 2, cols * cw, TRACK_W);
+    ctx.restore();
+  }
+
+  // Cars keep the thumbnail construction: wheels, two-tone body, glass and
+  // a cream number disc, all rotated to point along the direction of travel.
+  function drawCar(car, color, boosting) {
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.angle);
+    ctx.lineJoin = "round";
+
+    if (boosting) {
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      for (const oy of [-7, 0, 7]) {
+        ctx.beginPath();
+        ctx.moveTo(-19, oy);
+        ctx.lineTo(-31, oy);
+        ctx.stroke();
+      }
+    }
+
+    ctx.fillStyle = INK;
+    roundRect(-14, -14, 10, 5, 2); ctx.fill();
+    roundRect(5, -14, 10, 5, 2); ctx.fill();
+    roundRect(-14, 9, 10, 5, 2); ctx.fill();
+    roundRect(5, 9, 10, 5, 2); ctx.fill();
+
+    paintShape(-18, -10, 36, 20, 6, color);
+
+    roundRect(2, -7, 10, 14, 3);
+    ctx.fillStyle = INK;
+    ctx.fill();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(4, -5, 3, 10);
+
+    ctx.beginPath();
+    ctx.arc(-7, 0, 6.5, 0, Math.PI * 2);
+    ctx.fillStyle = CREAM;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.fillStyle = INK;
+    ctx.font = "700 9px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(car.num), -7, 1);
+    ctx.restore();
+  }
+
+  function drawOverlay() {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, W - 20, H - 20);
+    ctx.fillStyle = INK;
+    ctx.font = "700 26px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    let title, lines = [], hint;
+    if (won) {
+      title = "You win!";
+      lines = ["Time " + formatTime(elapsed), "Best lap " + formatTime(bestLap), "Score " + score];
+      hint = touchPhone() ? "Tap New game to race again" : "Press R for another race";
+    } else if (paused) {
+      title = "Paused";
+      hint = touchPhone() ? "Tap Pause to resume" : "Press P to resume";
+    } else {
+      title = "Rally Run";
+      lines = ["3 laps · 2 rivals", "Off-track slows you down"];
+      hint = touchPhone() ? "Drag to steer · drag up or tap to boost" : "Press Space to race · arrows to steer";
+    }
+    ctx.fillText(title, W / 2, H / 2 - 46);
+    ctx.fillStyle = CORAL;
+    ctx.fillRect(W / 2 - 34, H / 2 - 34, 68, 3);
+    ctx.fillStyle = INK;
+    ctx.font = "12px monospace";
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, H / 2 - 6 + i * 20));
+    ctx.fillText(hint, W / 2, H / 2 + 74);
+  }
+
+  function draw() {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+
+    // Faint ink grid lines keep the paper field measurable.
+    ctx.strokeStyle = "rgba(32,38,43,0.10)";
+    ctx.lineWidth = 1.5;
+    for (let x = 42; x < W; x += 42) {
+      ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); ctx.stroke();
+    }
+    for (let y = 42; y < H; y += 42) {
+      ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke();
+    }
+
+    paintEllipse(18, 96, 9, 7, TEAL);
+    paintEllipse(324, 116, 10, 8, CORAL);
+    paintEllipse(20, 348, 10, 8, CORAL);
+    paintEllipse(322, 352, 9, 7, TEAL);
+
+    drawTrack();
+    drawFinish();
+
+    const boosting = started && !paused && !won &&
+      (keys.boost || boostDrag || fuelPulse > 0) && player.fuel > 0 && player.dist <= TRACK_W / 2;
+    drawCar(rivals[0], rivals[0].color, false);
+    drawCar(rivals[1], rivals[1].color, false);
+    drawCar(player, CORAL, boosting);
+
+    // Fuel gauge drawn on the board so the HUD stays calm.
+    ctx.fillStyle = CREAM;
+    roundRect(14, H - 24, 78, 12, 4);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.fillStyle = player.fuel > 20 ? GOLD : CORAL;
+    roundRect(16, H - 22, Math.max(2, 74 * player.fuel / 100), 8, 3);
+    ctx.fill();
+    ctx.fillStyle = INK;
+    ctx.font = "700 9px monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("FUEL", 98, H - 14);
+
+    if (!started || paused || won) drawOverlay();
+  }
+
+  function loop(now) {
+    const dt = Math.max(0, Math.min(now - lastTime, 100)) / 1000;
+    lastTime = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
+  document.getElementById("newBtn").addEventListener("click", reset);
+  window.addEventListener("resize", resize);
+
+  window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
+    const k = e.key.toLowerCase();
+    if (["arrowleft", "arrowright", "arrowup", "arrowdown", "a", "d", "w", "s", " ", "p", "r"].includes(k)) e.preventDefault();
+    if (e.repeat && (k === "p" || k === "r")) return;
+    if (k === "arrowleft" || k === "a") { keys.left = true; startRace(); }
+    else if (k === "arrowright" || k === "d") { keys.right = true; startRace(); }
+    else if (k === "arrowup" || k === "w" || k === " ") { keys.boost = true; startRace(); }
+    else if (k === "arrowdown" || k === "s") { keys.brake = true; startRace(); }
+    else if (k === "p") { togglePause(); }
+    else if (k === "r") { reset(); }
+  });
+
+  window.addEventListener("keyup", e => {
+    if (phoneMode.matches) return;
+    const k = e.key.toLowerCase();
+    if (k === "arrowleft" || k === "a") keys.left = false;
+    else if (k === "arrowright" || k === "d") keys.right = false;
+    else if (k === "arrowup" || k === "w" || k === " ") keys.boost = false;
+    else if (k === "arrowdown" || k === "s") keys.brake = false;
+  });
+
+  canvas.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (activePointer !== null) return;
+    activePointer = e.pointerId;
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    pointerTap = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    startRace();
+    canvas.focus({ preventScroll: true });
+  });
+
+  canvas.addEventListener("pointermove", e => {
+    if (e.pointerId !== activePointer) return;
+    e.preventDefault();
+    const dx = e.clientX - pointerX;
+    const dy = e.clientY - pointerY;
+    steerDrag = clamp(dx / 70, -1, 1);
+    boostDrag = dy < -28;
+    if (Math.abs(dx) + Math.abs(dy) > 14) pointerTap = false;
+  });
+
+  function endPointer(e) {
+    if (e.pointerId !== activePointer) return;
+    if (pointerTap && started && !paused && !won) fuelPulse = 0.5;
+    activePointer = null;
+    steerDrag = 0;
+    boostDrag = false;
+    pointerTap = false;
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+
+  record = loadRecord();
+  best = record.score;
+  bestLap = record.lap;
+  resize();
+  reset();
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+<script>
+(() => {
+  const btn = document.getElementById("lights");
+  if (!btn) return;
+  const KEY = "arcade.theme.v1";
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    btn.setAttribute("aria-checked", String(theme === "light"));
+    try { localStorage.setItem(KEY, theme); } catch (_) {}
+  }
+  let saved = "dark";
+  try { saved = localStorage.getItem(KEY) || "dark"; } catch (_) {}
+  setTheme(saved === "light" ? "light" : "dark");
+  btn.addEventListener("click", () => {
+    setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>

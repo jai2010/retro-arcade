@@ -1,6 +1,6 @@
 # Offline Arcade
 
-Nineteen self-contained retro games. Each game is one HTML file with inline CSS and JavaScript.
+Twenty-two self-contained retro games. Each game is one HTML file with inline CSS and JavaScript.
 
 ## Play
 
@@ -31,6 +31,9 @@ No internet connection is required.
 | Sokoban | `sokoban/index.html` | Swipe or tap a neighbour to move |
 | Lunar Lander | `lunarlander/index.html` | Tap/hold to thrust, drag to steer |
 | Missile Command | `missilecommand/index.html` | Tap to intercept |
+| Road Rider | `roadrider/index.html` | Swipe lanes, tap to kick |
+| Rally Run | `rallyrun/index.html` | Drag to steer, tap to boost |
+| Highway Hero | `highwayhero/index.html` | Swipe lanes, tap to sprint |
 
 ## Notes
 
