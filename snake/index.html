@@ -366,6 +366,12 @@
   }
   /* Phone board sizing */
   @media (max-width: 760px) { .board-wrap { width: min(100%, calc((100dvh - 220px) * 1.0000)) !important; margin-inline: auto; } }
+  /* Phones play by tapping the board; hide the on-screen button pads. */
+  html.no-touch-pad .side .panel.touch,
+  html.no-touch-pad .side .panel:has(.touch),
+  html.no-touch-pad .side .panel:has(.pad),
+  html.no-touch-pad .side .panel:has(.pads) { display: none !important; }
+  html.no-touch-pad .shell { padding-bottom: 24px !important; }
 </style>
 </head>
 <body>
@@ -421,6 +427,12 @@
 
   // Keyboard play is desktop-only; phones use the touch controls.
   const phoneMode = window.matchMedia("(max-width: 760px)");
+
+  // Phones play by gestures on the board, so hide the on-screen button pads.
+  if (phoneMode.matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches)) {
+    document.documentElement.classList.add("no-touch-pad");
+  }
 
   const GRID = 20;
   const CELL = 15;

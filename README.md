@@ -32,9 +32,9 @@ No internet connection is required.
   teal secondary, system font, rounded surfaces, and visible focus states.
 - Every game uses the same two-column layout: playfield on the left, controls
   and instructions on the right. On narrow screens the two columns stack.
-- On phone-sized screens (760px or narrower), keyboard input is disabled and the
-  on-screen touch controls are the only way to play. Keyboard controls still work
-  on larger screens.
+- On phones (including landscape), keyboard input and the on-screen button pads are
+  hidden; play with swipe, drag and tap on the board. Pause and New game stay in the
+  header. Keyboard controls and button pads still work on larger screens.
 - The home page uses `thumbs/*.png`, cropped from the supplied illustration grid.
   They are local files; nothing is fetched over the network.
 - No external fonts, images, audio, libraries or network calls are used.
