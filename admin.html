@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Retro Arcade · Admin</title>
+<style>
+  :root { --paper:#f7f4ee; --ink:#20262b; --muted:#626a6f; --line:#d9d1c3; --accent:#e5724c; --panel:#fffdfa; --retro:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace; }
+  body { margin:0; min-height:100dvh; background:var(--paper); color:var(--ink); font-family:var(--retro); padding:24px 14px; }
+  body[data-theme="dark"] { --paper:#171b1e; --ink:#f7f4ee; --muted:#aab2b7; --line:rgba(247,244,238,.22); --panel:#20262b; }
+  .wrap { max-width:960px; margin:0 auto; }
+  h1 { font-size:24px; text-transform:uppercase; letter-spacing:.08em; margin:0 0 4px; }
+  p.sub { margin:0 0 20px; color:var(--muted); font-size:12px; }
+  .card { background:var(--panel); border:2px solid var(--ink); border-radius:12px; padding:18px; margin-bottom:16px; }
+  label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:6px; }
+  input { width:100%; box-sizing:border-box; padding:10px 12px; font:inherit; font-size:14px; border:2px solid var(--ink); border-radius:8px; background:var(--paper); color:var(--ink); }
+  button { font:inherit; font-size:12px; text-transform:uppercase; letter-spacing:.06em; padding:10px 14px; min-height:44px; border:2px solid var(--ink); border-radius:8px; background:var(--panel); color:var(--ink); cursor:pointer; }
+  button.primary { background:var(--accent); color:#fffdfa; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th,td { padding:8px 6px; text-align:right; border-bottom:1px solid var(--line); }
+  th:first-child,td:first-child { text-align:left; }
+  th { text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-size:10px; }
+  .msg { min-height:20px; margin:8px 0; font-size:12px; color:var(--muted); }
+  .hidden { display:none !important; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Retro Arcade · Admin</h1>
+  <p class="sub">Usage collected offline and synced when a device goes online.</p>
+
+  <section class="card" id="login">
+    <label for="password">Admin password</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="Password">
+    <div class="row"><button type="button" class="primary" id="signin">Sign in</button></div>
+    <p class="msg" id="loginMsg"></p>
+  </section>
+
+  <section class="card hidden" id="panel">
+    <label for="server">Sync server base URL (for offline devices)</label>
+    <input id="server" type="url" placeholder="https://your-app.vercel.app">
+    <div class="row">
+      <button type="button" id="saveServer">Save URL</button>
+      <button type="button" id="export">Export CSV</button>
+      <button type="button" id="reset">Reset stats</button>
+      <button type="button" id="signout">Sign out</button>
+    </div>
+    <p class="msg" id="msg"></p>
+    <h2 style="font-size:14px;text-transform:uppercase;letter-spacing:.08em;margin:18px 0 8px">Games</h2>
+    <table>
+      <thead><tr><th>Game</th><th>Views</th><th>Plays</th><th>Likes</th><th>Bookmarks</th><th>Best</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6" style="text-align:center">Loading…</td></tr></tbody>
+    </table>
+  </section>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const base = location.protocol === "file:" ? (localStorage.getItem("arcade.metrics.server") || "") : "";
+  const api = action => (base ? base.replace(/\/$/, "") : "") + "/api/admin?action=" + action;
+  try { document.body.dataset.theme = localStorage.getItem("arcade.theme.v1") || "dark"; } catch (_) {}
+
+  function showPanel() { $("login").classList.add("hidden"); $("panel").classList.remove("hidden"); load(); }
+  function table(data) {
+    const games = Array.from(new Set(Object.keys(data.views || {}).concat(Object.keys(data.plays || {})))).sort();
+    $("rows").innerHTML = games.length ? games.map(g =>
+      "<tr><td>" + g + "</td><td>" + (data.views[g] || 0) + "</td><td>" + (data.plays[g] || 0) +
+      "</td><td>" + (data.likes[g] || 0) + "</td><td>" + (data.bookmarks[g] || 0) +
+      "</td><td>" + (data.bests[g] || "–") + "</td></tr>").join("")
+      : '<tr><td colspan="6" style="text-align:center">No events yet</td></tr>';
+  }
+  function load() {
+    fetch(api("data")).then(r => r.ok ? r.json() : null).then(j => {
+      if (j && j.ok) table(j.data); else { $("login").classList.remove("hidden"); $("panel").classList.add("hidden"); }
+    }).catch(() => { $("msg").textContent = "Cannot reach the metrics server."; });
+  }
+
+  $("signin").addEventListener("click", () => {
+    fetch(api("login"), { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({password:$("password").value}) })
+      .then(r => r.json()).then(j => {
+        if (j.ok) { $("loginMsg").textContent = ""; showPanel(); }
+        else $("loginMsg").textContent = "Wrong password.";
+      }).catch(() => { $("loginMsg").textContent = "Cannot reach the metrics server."; });
+  });
+  $("export").addEventListener("click", () => { location.href = api("export"); });
+  $("reset").addEventListener("click", () => {
+    if (!confirm("Reset all metrics?")) return;
+    fetch(api("reset"), { method:"POST" }).then(r => r.json()).then(j => { if (j.ok) { $("msg").textContent = "Stats reset."; load(); } });
+  });
+  $("signout").addEventListener("click", () => { document.cookie = "arcade_admin=; Max-Age=0; Path=/"; location.reload(); });
+  $("saveServer").addEventListener("click", () => {
+    try {
+      localStorage.setItem("arcade.metrics.server", $("server").value.replace(/\/$/, ""));
+      $("msg").textContent = "Saved. Offline devices will sync to this URL when online.";
+    } catch (_) {}
+  });
+  try { $("server").value = localStorage.getItem("arcade.metrics.server") || ""; } catch (_) {}
+  fetch(api("data")).then(r => { if (r.ok) showPanel(); });
+})();
+</script>
+</body>
+</html>

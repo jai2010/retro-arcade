@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="../metrics.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Minesweeper</title>
 <style>
@@ -86,6 +87,9 @@
   html.no-touch-pad .game { grid-template-columns:1fr !important; grid-template-rows:1fr !important; align-items:stretch !important; }
   html.no-touch-pad .play { width:100% !important; height:100%; justify-content:flex-start; }
   html.no-touch-pad .play .hud { width:100% !important; }
+   /* Compact chips keep the HUD on one line so the board stays full height. */
+   html.no-touch-pad .chips { gap:3px !important; }
+   html.no-touch-pad .chip { font-size:9px !important; padding:3px 5px !important; }
   html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%,calc((100dvh - 170px) * 1.0000)) !important; margin-inline:auto !important; }
   html.no-touch-pad .side { display:none !important; }
   html.no-touch-pad .gesture-tip {
@@ -123,7 +127,7 @@
   <header>
     <div>
       <h1>Minesweeper</h1>
-      <p class="tagline">Nine by nine. Ten mines. One careful tap.</p>
+      <p class="tagline">Three minefields. Ten, twenty-two, forty mines. One careful tap.</p>
     </div>
     <div class="actions">
       <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights"><span class="stick" aria-hidden="true"></span></button>
@@ -138,6 +142,7 @@
       <div class="hud" aria-live="polite">
         <div class="score-block"><span class="score-label">Time</span><strong id="score">0s</strong></div>
         <div class="chips">
+          <span class="chip level">Level <b id="level">1/3</b></span>
           <span class="chip">Mines <b id="mines">10</b></span>
           <span class="chip">Flags <b id="flags">0</b></span>
           <span class="chip best">Best <b id="best">0s</b></span>
@@ -145,7 +150,7 @@
       </div>
 
       <div class="board-wrap">
-        <canvas id="game" tabindex="0" role="img" aria-label="Minesweeper playfield, 9 by 9 grid with 10 mines">Your browser does not support canvas.</canvas>
+        <canvas id="game" tabindex="0" role="img" aria-label="Minesweeper playfield, level 1 of 3, 9 by 9 grid with 10 mines">Your browser does not support canvas.</canvas>
       </div>
       <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
         <span>Tap to reveal · long-press to flag</span>
@@ -156,8 +161,8 @@
     <aside class="side" aria-label="Instructions">
       <section class="panel">
         <h2>How to play</h2>
-        <p class="help">Tap a square to reveal it. Numbers show how many of the eight neighbours are mined. Empty squares open a whole region. Your first tap is always safe. Clear every safe square to win.</p>
-        <p class="hint">Long-press a square (or right-click) to plant a flag. Desktop: arrows move, Enter reveals, F flags, P pauses, R restarts.</p>
+        <p class="help">Three fields to clear: 9×9 with 10 mines, 12×12 with 22, then 16×16 with 40. Tap a square to reveal it. Numbers show how many of the eight neighbours are mined. Empty squares open a whole region. Your first tap is always safe. Clear every safe square to move on.</p>
+        <p class="hint">Long-press a square (or right-click) to plant a flag. Clear a field to reach the next level; clear level 3 to win the run.</p>
         <p class="record">Fastest clear <b id="sideBest">0s</b></p>
       </section>
     </aside>
@@ -199,8 +204,15 @@
     }
   }
 
-  const GRID = 9;
-  const MINES = 10;
+  // Three progressively larger fields; level 1 is the classic 9x9 board.
+  const LEVELS = [
+    { grid: 9, mines: 10 },
+    { grid: 12, mines: 22 },
+    { grid: 16, mines: 40 }
+  ];
+  let level = 0;
+  let GRID = LEVELS[0].grid;
+  let MINES = LEVELS[0].mines;
   const KEY = "minesweeper.best.v1";
   // Illustration palette, shared with the arcade thumbnails.
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
@@ -214,35 +226,66 @@
   const minesEl = document.getElementById("mines");
   const flagsEl = document.getElementById("flags");
   const bestEl = document.getElementById("best");
+  const levelEl = document.getElementById("level");
   const sideBestEl = document.getElementById("sideBest");
   const pauseBtn = document.getElementById("pauseBtn");
   const announceEl = document.getElementById("announce");
 
   let W = 300, H = 300;
   let board = [], phase = "idle", paused = false;
-  let elapsed = 0, flags = 0, revealed = 0;
-  let best = loadBest(), newRecord = false;
+  let elapsed = 0, flags = 0, revealed = 0, moves = 0;
+  let bests = loadBests(), best = 0, newRecord = false;
   let cursor = Math.floor(GRID / 2) * GRID + Math.floor(GRID / 2);
   let press = null;
   let lastTime = performance.now();
 
-  function loadBest() {
+  // Best times and move counts live per level under the original key. If
+  // localStorage is unavailable, the in-memory object still works this session.
+  function loadBests() {
+    const data = {};
     try {
-      const v = Number(window.localStorage.getItem(KEY));
-      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
-    } catch (_) { return 0; }
+      const raw = window.localStorage.getItem(KEY);
+      if (!raw) return data;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          Object.keys(parsed).forEach(k => {
+            const rec = parsed[k];
+            if (rec && typeof rec === "object") {
+              data[k] = { t: Number(rec.t) || 0, m: Number(rec.m) || 0 };
+            } else if (Number.isFinite(Number(rec))) {
+              data[k] = { t: Math.floor(Number(rec)), m: 0 };
+            }
+          });
+        }
+      } catch (_) {
+        // Older builds stored a single best time as a plain number.
+        const legacy = Number(raw);
+        if (Number.isFinite(legacy) && legacy > 0) data[0] = { t: Math.floor(legacy), m: 0 };
+      }
+    } catch (_) {}
+    return data;
   }
-  function saveBest(v) {
-    try { window.localStorage.setItem(KEY, String(v)); } catch (_) {}
+  function saveBests() {
+    try { window.localStorage.setItem(KEY, JSON.stringify(bests)); } catch (_) {}
+  }
+  function bestRecord() {
+    const rec = bests[level];
+    return rec && typeof rec === "object" ? rec : { t: 0, m: 0 };
   }
   function announce(text) { announceEl.textContent = text; }
   function updateStats() {
+    const rec = bestRecord();
+    best = rec.t || 0;
     const secs = Math.floor(elapsed);
+    const hasBest = best > 0 || rec.m > 0;
+    const bestText = hasBest ? best + "s · " + (rec.m || 0) + "m" : "0s";
     scoreEl.textContent = secs + "s";
+    levelEl.textContent = (level + 1) + "/" + LEVELS.length;
     minesEl.textContent = String(MINES);
     flagsEl.textContent = String(flags);
-    bestEl.textContent = best ? best + "s" : "0s";
-    sideBestEl.textContent = best ? best + "s" : "0s";
+    bestEl.textContent = bestText;
+    sideBestEl.textContent = bestText;
   }
   function forEachNeighbor(r, c, fn) {
     for (let dr = -1; dr <= 1; dr++) {
@@ -259,17 +302,40 @@
       Array.from({ length: GRID }, () => ({ mine: false, revealed: false, flagged: false, wrong: false, count: 0 })));
   }
 
-  function reset() {
+  function reset(message) {
     board = emptyBoard();
     phase = "idle"; paused = false;
-    elapsed = 0; flags = 0; revealed = 0; newRecord = false;
+    elapsed = 0; flags = 0; revealed = 0; moves = 0; newRecord = false;
     press = null;
     pauseBtn.textContent = "Pause";
     pauseBtn.setAttribute("aria-pressed", "false");
     updateStats();
-    announce("New game. Tap a square to begin.");
+    announce(message || "New game. Tap a square to begin.");
     canvas.focus({ preventScroll: true });
     draw();
+  }
+
+  function applyLevel() {
+    GRID = LEVELS[level].grid;
+    MINES = LEVELS[level].mines;
+    cursor = Math.floor(GRID / 2) * GRID + Math.floor(GRID / 2);
+    canvas.setAttribute("aria-label", "Minesweeper playfield, level " + (level + 1) + " of " + LEVELS.length +
+      ", " + GRID + " by " + GRID + " grid with " + MINES + " mines");
+  }
+
+  // Tapping the cleared overlay (or pressing Enter/N) moves to the next field;
+  // clearing the last one wraps back to level 1 for another run.
+  function advance() {
+    if (phase !== "won") return;
+    if (level + 1 < LEVELS.length) {
+      level++;
+      applyLevel();
+      reset("Level " + (level + 1) + " of " + LEVELS.length + ". Tap a square to begin.");
+    } else {
+      level = 0;
+      applyLevel();
+      reset("All " + LEVELS.length + " levels cleared. Tap a square to start again.");
+    }
   }
 
   // Mines are laid after the first reveal, so that square and its neighbours are safe.
@@ -331,9 +397,15 @@
       }
     }
     const secs = Math.floor(elapsed);
-    if (best === 0 || secs < best) { best = secs; saveBest(best); newRecord = true; }
+    const rec = bestRecord();
+    if (!rec.t || secs < rec.t || (secs === rec.t && (!rec.m || moves < rec.m))) {
+      bests[level] = { t: secs, m: moves };
+      saveBests();
+      newRecord = true;
+    }
     updateStats();
-    announce("Field cleared in " + secs + " seconds. Best " + best + " seconds.");
+    const final = level === LEVELS.length - 1;
+    announce((final ? "All levels cleared" : "Field cleared") + " in " + secs + " seconds. Best " + best + " seconds.");
   }
 
   function reveal(r, c) {
@@ -358,8 +430,10 @@
   }
 
   function tap(r, c) {
-    if (phase === "over" || phase === "won") { reset(); return; }
+    if (phase === "won") { advance(); return; }
+    if (phase === "over") { reset(); return; }
     if (paused) return;
+    if (!board[r][c].revealed && !board[r][c].flagged) moves++;
     reveal(r, c);
   }
 
@@ -580,10 +654,16 @@
 
     if (paused || phase === "idle" || phase === "over" || phase === "won") {
       const secs = Math.floor(elapsed);
-      const title = phase === "over" ? "Boom!" : phase === "won" ? (newRecord ? "New record!" : "Cleared!") : paused ? "Paused" : "Ready?";
+      const final = phase === "won" && level === LEVELS.length - 1;
+      const title = phase === "over" ? "Boom!" : phase === "won" ? (final ? "All clear!" : newRecord ? "New record!" : "Cleared!") : paused ? "Paused" : "Ready?";
       let hint;
-      if (phase === "over") hint = "Hit a mine at " + secs + "s — " + (isPhone ? "tap to try again" : "press R or tap to try again");
-      else if (phase === "won") hint = secs + "s · best " + best + "s — " + (isPhone ? "tap to play again" : "press R or tap to play again");
+      if (phase === "over") hint = "Hit a mine at " + secs + "s — " + (isPhone ? "tap to retry this level" : "press R or tap to retry this level");
+      else if (phase === "won") {
+        const action = final
+          ? (isPhone ? "tap to play again" : "press Enter or N to play again")
+          : (isPhone ? "tap for next level" : "press Enter or N for next level");
+        hint = secs + "s · best " + best + "s — " + action;
+      }
       else if (paused) hint = "Tap Pause to resume";
       else hint = isPhone ? "Tap a square to begin" : "Tap a square or press Enter to begin";
       drawOverlay(title, hint);
@@ -631,7 +711,7 @@
   });
 
   pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
-  document.getElementById("newBtn").addEventListener("click", reset);
+  document.getElementById("newBtn").addEventListener("click", () => reset());
 
   window.addEventListener("keydown", e => {
     if (phoneMode.matches) return;
@@ -641,12 +721,13 @@
     if (key === "ArrowUp" || key === "w" || key === "W") { e.preventDefault(); cursor = Math.max(0, cursor - GRID); return; }
     if (key === "ArrowDown" || key === "s" || key === "S") { e.preventDefault(); cursor = Math.min(GRID * GRID - 1, cursor + GRID); return; }
     if (key === "Enter" || key === " ") { e.preventDefault(); tap(Math.floor(cursor / GRID), cursor % GRID); return; }
+    if (key === "n" || key === "N") { e.preventDefault(); advance(); return; }
     if (key === "f" || key === "F") { e.preventDefault(); toggleFlag(Math.floor(cursor / GRID), cursor % GRID); return; }
     if (key === "p" || key === "P") { e.preventDefault(); togglePause(); return; }
     if (key === "r" || key === "R") { e.preventDefault(); reset(); }
   });
 
-  best = loadBest();
+  applyLevel();
   lastTime = performance.now();
   resize();
   reset();

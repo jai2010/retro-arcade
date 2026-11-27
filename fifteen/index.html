@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="../metrics.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>15 Puzzle</title>
 <style>
@@ -31,7 +32,7 @@
   body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:5; background:repeating-linear-gradient(180deg, rgba(128,128,128,.035) 0 1px, transparent 1px 4px); }
   body[data-theme="dark"] { --paper:#171b1e; --ink:#f7f4ee; --muted:#aab2b7; --line:rgba(247,244,238,.22); --surface:#20262b; --sand:#2b3237; }
   .shell {
-    --board-w: min(calc(100dvh - 150px), 700px);
+    --board-w: min(calc((100dvh - 160px) * .8696), 700px);
     --side-w: 270px;
     --gap: clamp(12px, 2vw, 24px);
     --content-w: calc(var(--board-w) + var(--gap) + var(--side-w));
@@ -125,7 +126,7 @@
   <header>
     <div>
       <h1>15 Puzzle</h1>
-      <p class="tagline">Slide tiles into order. Fewest moves wins.</p>
+      <p class="tagline">Three slides: 3×3, 4×4, 5×5. Fewest moves wins.</p>
     </div>
     <div class="actions">
       <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights"><span class="stick" aria-hidden="true"></span></button>
@@ -139,23 +140,29 @@
       <div class="hud" aria-live="polite">
         <div class="score-block"><span class="score-label">Moves</span><strong id="score">0</strong></div>
         <div class="chips">
+          <span class="chip">Level <b id="level">1/3</b></span>
+          <span class="chip">Par <b id="par">20</b></span>
           <span class="chip">Time <b id="time">0:00</b></span>
           <span class="chip best">Best <b id="best">—</b></span>
         </div>
       </div>
       <div class="board-wrap">
-        <canvas id="game" tabindex="0" role="img" aria-label="15 Puzzle playfield, 4 by 4 tiles">Your browser does not support canvas.</canvas>
+        <canvas id="game" tabindex="0" role="img" aria-label="3 by 3 puzzle playfield, level 1 of 3">Your browser does not support canvas.</canvas>
       </div>
       <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls"><span>Tap a tile next to the gap to slide it</span><button type="button" class="tip-close" aria-label="Close controls tip">×</button></div>
     </section>
     <aside class="side" aria-label="Instructions">
       <section class="panel">
         <h2>Goal</h2>
-        <p>Put the tiles in order, 1 through 15, with the gap in the last square.</p>
+        <p>Put the tiles in order with the gap in the last square. Clear 3×3, then 4×4, then 5×5.</p>
       </section>
       <section class="panel">
-        <h2>Controls</h2>
-        <p><b>Phone:</b> tap a tile beside the gap. <b>Desktop:</b> arrow keys slide the neighbouring tile, <b>P</b> pauses and <b>R</b> shuffles.</p>
+        <h2>Par</h2>
+        <p>Level 1 — 20 moves. Level 2 — 60 moves. Level 3 — 120 moves.</p>
+      </section>
+      <section class="panel">
+        <h2>Play</h2>
+        <p>Tap a tile beside the gap to slide it. Your best is kept for each level.</p>
       </section>
     </aside>
   </main>
@@ -186,8 +193,12 @@
     if (document.documentElement.classList.contains("no-touch-pad")) tip.classList.add("is-open");
   }
 
-  const N = 4, W = 400, H = 460;
-  const TILE = 88, OX = 24, OY = 46;
+  const LEVELS = [
+    { size: 3, par: 20 },
+    { size: 4, par: 60 },
+    { size: 5, par: 120 }
+  ];
+  const W = 400, H = 460, OY = 46, PAD = 24;
   const KEY = "fifteen.best.v1";
   // Illustration palette, shared with the arcade thumbnails.
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
@@ -196,24 +207,43 @@
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const scoreEl = document.getElementById("score");
+  const levelEl = document.getElementById("level");
+  const parEl = document.getElementById("par");
   const timeEl = document.getElementById("time");
   const bestEl = document.getElementById("best");
   const pauseBtn = document.getElementById("pauseBtn");
   const announceEl = document.getElementById("announce");
 
-  let tiles, blank, moves, elapsed, lastTime, paused, won, started, anim, best;
+  let N = 3, TILE = 117, OX = 24;
+  let level = 0, tiles, blank, moves, elapsed, lastTime, paused, won, started, anim, nextBtn = null;
   const held = new Set();
   const isPhone = () => document.documentElement.classList.contains("no-touch-pad");
   const fmtTime = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
 
   function announce(text) { announceEl.textContent = text; }
-  function loadBest() {
-    try {
-      const v = Number(window.localStorage.getItem(KEY));
-      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
-    } catch (_) { return 0; }
+
+  // Best move counts per level as one small JSON object. If storage is blocked,
+  // the in-memory copy still works for the current session.
+  let bests = {};
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) bests = parsed;
+    }
+  } catch (_) {}
+  function saveBests() { try { window.localStorage.setItem(KEY, JSON.stringify(bests)); } catch (_) {} }
+  function bestFor(lvl) {
+    const v = Number(bests[String(lvl)]);
+    return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
   }
-  function saveBest(v) { try { window.localStorage.setItem(KEY, String(v)); } catch (_) {} }
+
+  // Keep the board inside the illustrated frame for every grid size.
+  function layout(size) {
+    N = size;
+    TILE = Math.floor((W - 2 * PAD) / N);
+    OX = Math.round((W - N * TILE) / 2);
+  }
 
   function neighbours(i) {
     const x = i % N, y = Math.floor(i / N), out = [];
@@ -241,7 +271,9 @@
     if (solved()) shuffle();
   }
 
-  function reset() {
+  function startLevel(idx) {
+    level = idx;
+    layout(LEVELS[level].size);
     shuffle();
     moves = 0;
     elapsed = 0;
@@ -249,27 +281,36 @@
     won = false;
     started = false;
     anim = null;
+    nextBtn = null;
     pauseBtn.textContent = "Pause";
     pauseBtn.setAttribute("aria-pressed", "false");
+    canvas.setAttribute("aria-label", LEVELS[level].size + " by " + LEVELS[level].size +
+      " puzzle playfield, level " + (level + 1) + " of " + LEVELS.length);
     updateStats();
-    announce("New puzzle");
+    announce("Level " + (level + 1) + " of " + LEVELS.length + ", " +
+      LEVELS[level].size + " by " + LEVELS[level].size + ", par " + LEVELS[level].par + " moves");
     canvas.focus({ preventScroll: true });
   }
+  function reset() { startLevel(level); }
+  function nextLevel() { startLevel((level + 1) % LEVELS.length); }
 
   function updateStats() {
     scoreEl.textContent = String(moves);
+    levelEl.textContent = (level + 1) + "/" + LEVELS.length;
+    parEl.textContent = String(LEVELS[level].par);
     timeEl.textContent = fmtTime(elapsed);
-    bestEl.textContent = best ? String(best) : "—";
+    const b = bestFor(level + 1);
+    bestEl.textContent = b ? String(b) : "—";
   }
 
   function slide(index) {
     if (paused || won || !neighbours(blank).includes(index)) return;
-    const fromX = (index % N) * TILE, fromY = Math.floor(index / N) * TILE;
+    const fromX = OX + (index % N) * TILE, fromY = OY + Math.floor(index / N) * TILE;
     anim = {
       value: tiles[index],
       x: fromX, y: fromY,
-      dx: (blank % N) * TILE - fromX,
-      dy: Math.floor(blank / N) * TILE - fromY,
+      dx: ((blank % N) - (index % N)) * TILE,
+      dy: (Math.floor(blank / N) - Math.floor(index / N)) * TILE,
       t: 0
     };
     tiles[blank] = tiles[index];
@@ -277,14 +318,14 @@
     blank = index;
     moves++;
     started = true;
-    updateStats();
     if (solved()) {
       won = true;
-      let record = false;
-      if (!best || moves < best) { best = moves; saveBest(best); record = true; }
-      updateStats();
-      announce((record ? "New best! " : "") + "Solved in " + moves + " moves");
+      const key = String(level + 1), cur = Number(bests[key]);
+      const record = !Number.isFinite(cur) || cur <= 0 || moves < cur;
+      if (record) { bests[key] = moves; saveBests(); }
+      announce((record ? "New best! " : "") + "Level " + (level + 1) + " solved in " + moves + " moves");
     }
+    updateStats();
   }
 
   function roundRect(x, y, w, h, r) {
@@ -304,7 +345,7 @@
     ctx.translate(cx, cy);
     ctx.fillStyle = INK;
     ctx.strokeStyle = INK;
-    ctx.lineWidth = Math.max(3, s * 0.1);
+    ctx.lineWidth = Math.max(2.5, s * 0.1);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     const dot = (x, y, scale = 1) => {
@@ -359,6 +400,15 @@
       case 13: chevron(Math.PI / 2); break;
       case 14: chevron(-Math.PI / 2); break;
       case 15: corner(Math.PI); break;
+      case 16: corner(Math.PI / 2); break;
+      case 17: corner(-Math.PI / 2); break;
+      case 18: chevron(Math.PI / 4); break;
+      case 19: chevron(-Math.PI / 4); break;
+      case 20: dots(4, false); break;
+      case 21: dots(4, true); break;
+      case 22: arrow(Math.PI / 4); break;
+      case 23: arrow(-Math.PI / 4); break;
+      case 24: dot(0, 0, 1.7); break;
     }
     ctx.restore();
   }
@@ -377,6 +427,50 @@
     ctx.strokeStyle = INK;
     ctx.stroke();
     drawMark(value, x + TILE / 2, y + TILE / 2, TILE);
+  }
+
+  function drawOverlay() {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, W - 20, H - 20);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = INK;
+    const final = level === LEVELS.length - 1;
+    ctx.font = "700 24px ui-monospace, monospace";
+    ctx.fillText(won ? (final ? "You win!" : "Solved!") : paused ? "Paused" : "Ready?", W / 2, H / 2 - 20);
+    ctx.fillStyle = CORAL;
+    ctx.fillRect(W / 2 - 34, H / 2 - 10, 68, 3);
+    ctx.font = "12px ui-monospace, monospace";
+    ctx.fillStyle = INK;
+    if (won) {
+      ctx.fillText(moves + " moves · " + fmtTime(elapsed) + " · par " + LEVELS[level].par, W / 2, H / 2 + 14);
+      if (!final) {
+        const bw = 190, bh = 40, bx = W / 2 - bw / 2, by = H / 2 + 34;
+        nextBtn = { x: bx, y: by, w: bw, h: bh };
+        roundRect(bx, by, bw, bh, 9);
+        ctx.fillStyle = CORAL;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = INK;
+        ctx.stroke();
+        ctx.fillStyle = CREAM;
+        ctx.font = "700 13px ui-monospace, monospace";
+        ctx.fillText("NEXT LEVEL →", W / 2, by + 26);
+        ctx.fillStyle = INK;
+        ctx.font = "12px ui-monospace, monospace";
+        ctx.fillText("Tap Next level to continue", W / 2, by + bh + 24);
+      } else {
+        nextBtn = null;
+        ctx.fillText("Tap to play again", W / 2, H / 2 + 54);
+      }
+    } else {
+      nextBtn = null;
+      const hint = paused ? "Tap Pause to resume" : "Tap a tile to begin";
+      ctx.fillText(hint, W / 2, H / 2 + 18);
+    }
   }
 
   function draw() {
@@ -400,7 +494,7 @@
     ctx.stroke();
 
     // One empty slot, a plain sand-coloured square with no mark.
-    const bx = (blank % N) * TILE, by = Math.floor(blank / N) * TILE;
+    const bx = OX + (blank % N) * TILE, by = OY + Math.floor(blank / N) * TILE;
     roundRect(bx + 4, by + 4, TILE - 8, TILE - 8, 9);
     ctx.fillStyle = TINTS[GOLD];
     ctx.fill();
@@ -412,7 +506,7 @@
 
     for (let i = 0; i < tiles.length; i++) {
       if (tiles[i] === 0) continue;
-      let x = (i % N) * TILE, y = Math.floor(i / N) * TILE;
+      let x = OX + (i % N) * TILE, y = OY + Math.floor(i / N) * TILE;
       if (anim && i === blank) {
         const t = Math.min(1, anim.t);
         const eased = 1 - Math.pow(1 - t, 3);
@@ -428,31 +522,8 @@
     ctx.textBaseline = "alphabetic";
     ctx.fillText("SLIDE · SOLVE · REPEAT", W / 2, 440);
 
-    if (paused || won || !started) {
-      ctx.fillStyle = PAPER;
-      ctx.fillRect(0, 0, W, H);
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = 4;
-      ctx.strokeRect(10, 10, W - 20, H - 20);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = INK;
-      ctx.font = "700 24px ui-monospace, monospace";
-      ctx.fillText(won ? "Solved!" : paused ? "Paused" : "Ready?", W / 2, H / 2 - 12);
-      ctx.fillStyle = CORAL;
-      ctx.fillRect(W / 2 - 34, H / 2 - 2, 68, 3);
-      ctx.font = "12px ui-monospace, monospace";
-      ctx.fillStyle = INK;
-      const hint = won ? (isPhone() ? "Tap New game to shuffle again" : "Press R to shuffle again")
-        : paused ? (isPhone() ? "Tap Pause to resume" : "Press P to resume")
-        : (isPhone() ? "Tap a tile to begin" : "Use arrow keys to begin");
-      ctx.fillText(hint, W / 2, H / 2 + 22);
-      if (won) {
-        ctx.fillStyle = CORAL;
-        ctx.font = "700 13px ui-monospace, monospace";
-        ctx.fillText(moves + " moves · " + fmtTime(elapsed), W / 2, H / 2 + 46);
-      }
-    }
+    if (paused || won || !started) drawOverlay();
+    else nextBtn = null;
   }
 
   function loop(now) {
@@ -493,6 +564,10 @@
     const col = Math.floor((p.x - OX) / TILE), row = Math.floor((p.y - OY) / TILE);
     return col >= 0 && col < N && row >= 0 && row < N ? row * N + col : -1;
   }
+  function inButton(p) {
+    return !!nextBtn && p.x >= nextBtn.x && p.x <= nextBtn.x + nextBtn.w &&
+      p.y >= nextBtn.y && p.y <= nextBtn.y + nextBtn.h;
+  }
 
   pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
   document.getElementById("newBtn").addEventListener("click", reset);
@@ -504,19 +579,27 @@
     const moved = Math.abs(e.clientX - touchStart.x) + Math.abs(e.clientY - touchStart.y);
     touchStart = null;
     if (moved > 16) return;
-    if (won || (!started && paused)) { reset(); return; }
-    slide(tileAt(point(e)));
+    const p = point(e);
+    if (won) {
+      if (inButton(p)) nextLevel();
+      else if (level === LEVELS.length - 1) startLevel(0);
+      return;
+    }
+    if (!started && paused) { reset(); return; }
+    slide(tileAt(p));
   });
 
-  const arrows = { ArrowUp: -N, ArrowDown: N, ArrowLeft: -1, ArrowRight: 1 };
+  const arrows = () => ({ ArrowUp: -N, ArrowDown: N, ArrowLeft: -1, ArrowRight: 1 });
   window.addEventListener("keydown", e => {
     if (phoneMode.matches) return;
     if (held.has(e.key)) return;
     held.add(e.key);
-    if (won && (e.key === "r" || e.key === "R" || e.key === "Enter")) { e.preventDefault(); reset(); return; }
-    if (arrows[e.key]) {
+    if (won && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); nextLevel(); return; }
+    if (won && (e.key === "r" || e.key === "R")) { e.preventDefault(); reset(); return; }
+    const dirs = arrows();
+    if (dirs[e.key]) {
       e.preventDefault();
-      const target = blank + arrows[e.key];
+      const target = blank + dirs[e.key];
       // Reject wraps across rows/columns by checking actual adjacency.
       if (neighbours(blank).includes(target)) slide(target);
     } else if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); }
@@ -529,9 +612,8 @@
 
   if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
   window.addEventListener("resize", resize);
-  best = loadBest();
   lastTime = performance.now();
-  reset();
+  startLevel(0);
   resize();
   requestAnimationFrame(loop);
 })();

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="../metrics.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lunar Lander</title>
 <style>
@@ -30,7 +31,7 @@
   .score-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
   #score{font-size:clamp(24px,3.2vh,36px);line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent)}
   .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-  .chip{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--sand);border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .chip{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--sand);border-radius:999px;padding:3px 8px;white-space:nowrap}
   .chip b{color:var(--ink);font-variant-numeric:tabular-nums} .chip.best b{color:var(--accent)} .chip.low b{color:var(--accent)}
   .board-wrap{position:relative;aspect-ratio:342/450;background:var(--sand);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 10px 24px rgba(32,38,43,0.14);padding:8px}
   canvas.board{display:block;width:100%;height:100%;border-radius:var(--radius-sm);background:#fffdfa;touch-action:none;}
@@ -114,6 +115,7 @@
       <div class="hud board-width" aria-live="polite">
         <div class="score-block"><span class="score-label">Score</span><strong id="score">0</strong></div>
         <div class="chips">
+          <span class="chip" id="levelChip">Level <b id="levelText">1/4</b></span>
           <span class="chip" id="fuelChip">Fuel <b id="fuel">100%</b></span>
           <span class="chip best">Best <b id="best">0</b></span>
         </div>
@@ -131,11 +133,11 @@
     <aside class="side" aria-label="Instructions">
       <section class="panel">
         <h2>Safe landing</h2>
-        <p class="help">Both feet must be on the flat pad, the lander close to level, and the descent slow. Touch down anywhere else — or too fast — and it's a crash.</p>
+        <p class="help">Four levels: each pad is narrower and the wind picks up. Both feet must be on the pad, the lander close to level, and the descent slow. Miss the pad — or land too fast — and it's a crash.</p>
       </section>
       <section class="panel">
         <h2>Fuel &amp; score</h2>
-        <p class="hint">Thrust burns fuel. The score rewards a centred touchdown and the fuel you have left. On a phone, drag up to thrust and left or right to steer.</p>
+        <p class="hint">Later levels carry less fuel. A centred touchdown and fuel left over score more, and the best is saved for each level. On a phone, drag up to thrust and left or right to steer.</p>
       </section>
     </aside>
   </main>
@@ -173,6 +175,14 @@
   const THRUST = 128;
   const BURN = 16;
   const KEY = "lunarlander.best.v1";
+  // padW: drawn/hitbox pad width; wind: constant horizontal push (px/s²).
+  // The pad narrows and the wind grows; later levels start with less fuel.
+  const LEVELS = [
+    { padW: 64, wind: 0,  fuel: 100, rough: 96 },
+    { padW: 48, wind: 4,  fuel: 100, rough: 104 },
+    { padW: 38, wind: 8,  fuel: 80,  rough: 110 },
+    { padW: 30, wind: 12, fuel: 55,  rough: 116 }
+  ];
   // Illustration palette, shared with the arcade thumbnails.
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
   const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
@@ -183,21 +193,35 @@
   const scoreEl = document.getElementById("score");
   const fuelEl = document.getElementById("fuel");
   const fuelChip = document.getElementById("fuelChip");
+  const levelEl = document.getElementById("levelText");
   const bestEl = document.getElementById("best");
   const pauseBtn = document.getElementById("pauseBtn");
   const announceEl = document.getElementById("announce");
   const touchPhone = () => document.documentElement.classList.contains("no-touch-pad");
-  let lander, terrain, padX, padW, padY, particles, score, best, bestAnnounced;
+  let level, lander, terrain, padX, padW, padY, particles, score, best, bests, bestAnnounced;
   let started, paused, gameOver, landed, showScore, keys, pointer, lastTime;
-  // localStorage can be blocked for file:// pages; keep the best in memory then.
-  function loadBest() {
+  // localStorage can be blocked for file:// pages; keep the per-level bests in
+  // memory then. The stored value is a small JSON map of level -> best score.
+  function loadBests() {
+    const out = {};
     try {
-      const v = Number(window.localStorage.getItem(KEY));
-      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
-    } catch (_) { return 0; }
+      const raw = window.localStorage.getItem(KEY);
+      if (!raw) return out;
+      let v;
+      try { v = JSON.parse(raw); } catch (_) { v = Number(raw); }
+      if (typeof v === "number" && Number.isFinite(v)) {
+        if (v > 0) out[1] = Math.floor(v); // older, single-score saves
+      } else if (v && typeof v === "object") {
+        for (const k of Object.keys(v)) {
+          const n = Number(v[k]);
+          if (Number.isFinite(n) && n > 0) out[k] = Math.floor(n);
+        }
+      }
+    } catch (_) {}
+    return out;
   }
-  function saveBest(v) {
-    try { window.localStorage.setItem(KEY, String(v)); } catch (_) {}
+  function saveBests(map) {
+    try { window.localStorage.setItem(KEY, JSON.stringify(map)); } catch (_) {}
   }
   // Resizing the backing store clears it; the next animation frame redraws.
   function resize() {
@@ -206,15 +230,15 @@
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  function makeTerrain() {
-    padW = 64;
+  function makeTerrain(w, rough) {
+    padW = w;
     padX = 106 + Math.random() * 86;
     padY = 368 + Math.random() * 26;
     const xs = [0];
     for (let x = 34; x < W; x += 34) xs.push(x);
     xs.push(W);
     terrain = xs.filter(x => x < padX - 9 || x > padX + padW + 9)
-                .map(x => ({ x, y: 326 + Math.random() * 96 }));
+                .map(x => ({ x, y: 326 + Math.random() * rough }));
     terrain.push({ x: padX, y: padY }, { x: padX + padW, y: padY });
     terrain.sort((a, b) => a.x - b.x);
   }
@@ -229,12 +253,15 @@
     }
     return terrain[terrain.length - 1].y;
   }
-  function reset() {
-    makeTerrain();
-    lander = { x: W / 2, y: 58, vx: 20, vy: 0, angle: 0, fuel: 100, thrusting: false };
+  function startLevel(n) {
+    level = Math.max(1, Math.min(LEVELS.length, n));
+    const L = LEVELS[level - 1];
+    makeTerrain(L.padW, L.rough);
+    lander = { x: W / 2, y: 58, vx: 20, vy: 0, angle: 0, fuel: L.fuel, thrusting: false };
     particles = [];
     score = 0;
     showScore = 0;
+    best = bests[level] || 0;
     bestAnnounced = false;
     started = false;
     paused = false;
@@ -242,16 +269,21 @@
     landed = false;
     keys = { thrust: false, left: false, right: false };
     pointer = { down: false, x: 0, y: 0, startX: 0, startY: 0, tilt: 0, power: 0 };
+    levelEl.textContent = level + "/" + LEVELS.length;
     pauseBtn.textContent = "Pause";
     pauseBtn.setAttribute("aria-pressed", "false");
     updateStats();
-    announce("New game");
+    announce("Level " + level + " of " + LEVELS.length);
     canvas.focus({ preventScroll: true });
   }
+  function reset() { startLevel(1); }
+  function retryLevel() { startLevel(level); }
+  function nextLevel() { startLevel(level < LEVELS.length ? level + 1 : 1); }
   function updateStats() {
     if (score > best) {
       best = score;
-      saveBest(best);
+      bests[level] = best;
+      saveBests(bests);
       if (!bestAnnounced) { bestAnnounced = true; announce("New best score"); }
     }
     scoreEl.textContent = String(score);
@@ -307,7 +339,7 @@
       lander.angle += (pointer.tilt - lander.angle) * Math.min(1, dt * 7);
     }
     lander.angle = Math.max(-1.1, Math.min(1.1, lander.angle));
-    let ax = 0, ay = GRAVITY;
+    let ax = LEVELS[level - 1].wind, ay = GRAVITY;
     if (lander.thrusting) {
       ax += -Math.sin(lander.angle) * THRUST * power;
       ay += -Math.cos(lander.angle) * THRUST * power;
@@ -480,6 +512,34 @@
     ctx.fillStyle = lander.fuel <= 20 ? CORAL : TEAL; ctx.fill();
   }
 
+  // Wind badge in the same outlined-paper style as the fuel gauge: a calm
+  // word on level 1, then one to three coral arrows pointing with the push.
+  function drawWind() {
+    const wind = LEVELS[level - 1].wind;
+    const x = W - 122, y = 14, w = 110, h = 22;
+    paintShape(x, y, w, h, 7, PAPER);
+    ctx.font = "9px monospace";
+    ctx.textAlign = "left";
+    ctx.fillStyle = INK;
+    ctx.fillText("WIND", x + 7, y + 14);
+    if (!wind) {
+      ctx.fillStyle = TEAL;
+      ctx.fillText("CALM", x + 50, y + 14);
+      return;
+    }
+    const arrows = Math.round(wind / 4);
+    ctx.strokeStyle = CORAL;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    for (let i = 0; i < arrows; i++) {
+      const ax = x + 48 + i * 17;
+      ctx.beginPath();
+      ctx.moveTo(ax, y + 14); ctx.lineTo(ax + 10, y + 14);
+      ctx.moveTo(ax + 6, y + 10); ctx.lineTo(ax + 10, y + 14); ctx.lineTo(ax + 6, y + 18);
+      ctx.stroke();
+    }
+  }
+
   function draw() {
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
@@ -503,10 +563,11 @@
     for (const p of terrain) ctx.lineTo(p.x, p.y);
     ctx.lineWidth = 3; ctx.strokeStyle = TINTS[TEAL]; ctx.stroke();
     // Grey-blue craters: dark cylindrical walls with lighter elliptical rims.
+    const craterY = (x, floor) => Math.min(H - 16, Math.max(terrainHeight(x) + 22, floor));
     const craters = [
-      { x: 44, y: Math.max(terrainHeight(44) + 22, H - 56), r: 29 },
-      { x: 170, y: Math.max(terrainHeight(170) + 22, H - 30), r: 26 },
-      { x: 288, y: Math.max(terrainHeight(288) + 22, H - 60), r: 32 }
+      { x: 44, y: craterY(44, H - 56), r: 29 },
+      { x: 170, y: craterY(170, H - 30), r: 26 },
+      { x: 288, y: craterY(288, H - 60), r: 32 }
     ];
     for (const c of craters) {
       ctx.beginPath();
@@ -558,11 +619,12 @@
     drawLander();
     drawFuelGauge();
     if (started && !paused && !gameOver && !landed) {
-      paintShape(70, 14, W - 140, 22, 7, PAPER);
-      ctx.font = "9px monospace";
+      paintShape(12, 14, 200, 22, 7, PAPER);
+      ctx.font = "8px monospace";
       ctx.fillStyle = INK;
       ctx.textAlign = "center";
-      ctx.fillText(touchPhone() ? "DRAG UP: THRUST   ·   DRAG SIDEWAYS: STEER" : "↑: THRUST   ·   ← →: TILT", W / 2, 29);
+      ctx.fillText(touchPhone() ? "DRAG UP: THRUST   ·   DRAG SIDEWAYS: STEER" : "↑: THRUST   ·   ← →: TILT", 112, 29);
+      drawWind();
     }
     if (paused || gameOver || landed || !started) {
       ctx.fillStyle = PAPER;
@@ -573,15 +635,18 @@
       ctx.fillStyle = INK;
       ctx.font = "700 25px monospace";
       ctx.textAlign = "center";
-      const title = gameOver ? "Crashed" : landed ? "Landed!" : paused ? "Paused" : "Ready?";
+      const complete = landed && level === LEVELS.length;
+      const title = gameOver ? "Crashed" : complete ? "Mission complete!" : landed ? "Landed!" : paused ? "Paused" : "Ready?";
+      ctx.font = complete ? "700 19px monospace" : "700 25px monospace";
       ctx.fillText(title, W / 2, H / 2 - 20);
       ctx.fillStyle = CORAL;
       ctx.fillRect(W / 2 - 40, H / 2 - 10, 80, 3);
       ctx.font = "12px monospace";
       ctx.fillStyle = INK;
       let hint;
-      if (gameOver) hint = touchPhone() ? "Tap the board to try again" : "Press R to try again";
-      else if (landed) hint = touchPhone() ? "Tap the board to fly again" : "Press R to fly again";
+      if (gameOver) hint = "Level " + level + " — try that pad again";
+      else if (complete) hint = "All four levels cleared";
+      else if (landed) hint = "Level " + level + " landed cleanly";
       else if (paused) hint = touchPhone() ? "Tap Pause to resume" : "Press P to resume";
       else hint = touchPhone() ? "Drag up to thrust · sideways to steer" : "Press ↑ to thrust · ← → to tilt";
       ctx.fillText(hint, W / 2, H / 2 + 12);
@@ -589,6 +654,16 @@
         ctx.fillStyle = landed ? TEAL : CORAL;
         ctx.font = "700 15px monospace";
         ctx.fillText((landed ? "Score " : "Fuel left ") + (landed ? score : Math.round(lander.fuel) + "%"), W / 2, H / 2 + 40);
+      }
+      if (landed || gameOver) {
+        const action = gameOver ? (touchPhone() ? "TAP TO RETRY" : "PRESS R: RETRY")
+          : complete ? (touchPhone() ? "TAP TO PLAY AGAIN" : "PRESS ENTER: PLAY AGAIN")
+          : (touchPhone() ? "TAP: NEXT LEVEL" : "PRESS ENTER: NEXT LEVEL");
+        paintShape(W / 2 - 92, H / 2 + 52, 184, 28, 7, gameOver ? CREAM : TEAL);
+        ctx.font = "700 11px monospace";
+        ctx.fillStyle = gameOver ? INK : CREAM;
+        ctx.textAlign = "center";
+        ctx.fillText(action, W / 2, H / 2 + 70);
       }
     }
   }
@@ -614,7 +689,10 @@
       e.preventDefault(); keys.right = true; started = true; return;
     }
     if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); return; }
-    if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); }
+    if (e.key === "r" || e.key === "R") { e.preventDefault(); retryLevel(); return; }
+    if (landed && !e.repeat && (e.key === "Enter" || e.key === "n" || e.key === "N")) {
+      e.preventDefault(); nextLevel();
+    }
   });
   window.addEventListener("keyup", e => {
     if (phoneMode.matches) return;
@@ -628,13 +706,19 @@
   }
   canvas.addEventListener("pointerdown", e => {
     e.preventDefault();
+    // A tap on an end overlay acts as the action shown there.
+    if (gameOver || landed) {
+      if (gameOver) retryLevel(); else nextLevel();
+      started = true;
+      canvas.focus({ preventScroll: true });
+      return;
+    }
     const p = pointerPos(e);
     pointer.down = true;
     pointer.startX = p.x; pointer.startY = p.y;
     pointer.x = p.x; pointer.y = p.y;
     pointer.tilt = lander.angle;
     pointer.power = 0;
-    if (gameOver || landed) { reset(); }
     started = true;
     canvas.focus({ preventScroll: true });
   });
@@ -650,7 +734,8 @@
   canvas.addEventListener("pointerup", endPointer);
   canvas.addEventListener("pointercancel", endPointer);
   canvas.addEventListener("pointerleave", endPointer);
-  best = loadBest();
+  bests = loadBests();
+  level = 1;
   resize();
   reset();
   lastTime = performance.now();

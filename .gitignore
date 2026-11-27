@@ -1,3 +1,6 @@
 .DS_Store
 __pycache__/
 img/final.png
+img/racers-final.png
+.data/
+node_modules/

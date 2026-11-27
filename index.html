@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="metrics.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Offline Arcade</title>
 <style>
@@ -190,6 +191,67 @@
     .marquee { align-items: flex-start; }
   }
 
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 20px;
+  }
+  .filter {
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    padding: 8px 12px;
+    min-height: 36px;
+    border: 2px solid var(--frame);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sub);
+    cursor: pointer;
+  }
+  .filter:hover { border-color: var(--accent); color: var(--fg); }
+  .filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fffdfa; }
+  .game-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .tile { position: relative; width: 100%; }
+  .tile img { width: 100%; }
+  .metrics {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: rgba(32,38,43,.78);
+    color: #fffdfa;
+    font-size: 10px;
+    line-height: 1.2;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+  .tile-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; }
+  .tile-actions button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+    background: var(--panel);
+    color: var(--fg);
+    font: 700 14px/1 var(--retro);
+    cursor: pointer;
+    box-shadow: 0 2px 0 var(--frame);
+  }
+  .tile-actions button:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .tile-actions button[aria-pressed="true"] { background: var(--accent); color: #fffdfa; }
+  @media (max-width: 640px) {
+    .metrics { font-size: 9px; padding: 3px 4px; }
+    .tile-actions button { width: 30px; height: 30px; }
+  }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: 0.01ms !important; }
   }
@@ -201,7 +263,6 @@
     <div>
       <p class="eyebrow">Offline arcade</p>
       <h1>Retro Arcade</h1>
-      <p class="count">No connection · no install · no accounts</p>
     </div>
     <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights">
       <span class="base" aria-hidden="true"><span class="stick"></span></span>
@@ -209,29 +270,257 @@
     </button>
   </header>
 
+  <div class="filters" role="group" aria-label="Filter games">
+    <button type="button" class="filter" data-filter="all" aria-pressed="true">All</button>
+    <button type="button" class="filter" data-filter="classics" aria-pressed="false">Classics</button>
+    <button type="button" class="filter" data-filter="puzzle" aria-pressed="false">Puzzle</button>
+    <button type="button" class="filter" data-filter="action" aria-pressed="false">Action</button>
+    <button type="button" class="filter" data-filter="racing" aria-pressed="false">Racing</button>
+  </div>
+
   <main class="grid">
-    <a class="game" href="tetris/index.html"><img src="img/tetris.png" alt=""><span class="name">Tetris</span></a>
-    <a class="game" href="snake/index.html"><img src="img/snake.png" alt=""><span class="name">Snake</span></a>
-    <a class="game" href="breakout/index.html"><img src="img/breakout.png" alt=""><span class="name">Breakout</span></a>
-    <a class="game" href="invaders/index.html"><img src="img/space_invaders.png" alt=""><span class="name">Space Invaders</span></a>
-    <a class="game" href="asteroids/index.html"><img src="img/asteroids.png" alt=""><span class="name">Asteroids</span></a>
-    <a class="game" href="pong/index.html"><img src="img/pong1.png" alt=""><span class="name">Pong</span></a>
-    <a class="game" href="frogger/index.html"><img src="img/frogger.png" alt=""><span class="name">Frogger</span></a>
-    <a class="game" href="2048/index.html"><img src="img/2048.png" alt=""><span class="name">2048</span></a>
-    <a class="game" href="simon/index.html"><img src="img/simon.png" alt=""><span class="name">Simon</span></a>
-    <a class="game" href="pacman/index.html"><img src="img/pacman.png" alt=""><span class="name">Pac-Man</span></a>
-    <a class="game" href="skyhop/index.html"><img src="img/skyhop.webp" alt=""><span class="name">Sky Hop</span></a>
-    <a class="game" href="whackamole/index.html"><img src="img/whackamole.webp" alt=""><span class="name">Whack-a-Mole</span></a>
-    <a class="game" href="memory/index.html"><img src="img/memory.webp" alt=""><span class="name">Memory</span></a>
-    <a class="game" href="fifteen/index.html"><img src="img/fifteen.webp" alt=""><span class="name">15 Puzzle</span></a>
-    <a class="game" href="minesweeper/index.html"><img src="img/minesweeper.webp" alt=""><span class="name">Minesweeper</span></a>
-    <a class="game" href="connect4/index.html"><img src="img/connect4.webp" alt=""><span class="name">Connect Four</span></a>
-    <a class="game" href="sokoban/index.html"><img src="img/sokoban.webp" alt=""><span class="name">Sokoban</span></a>
-    <a class="game" href="lunarlander/index.html"><img src="img/lunarlander.webp" alt=""><span class="name">Lunar Lander</span></a>
-    <a class="game" href="missilecommand/index.html"><img src="img/missilecommand.webp" alt=""><span class="name">Missile Command</span></a>
-    <a class="game" href="roadrider/index.html"><img src="img/roadrider.svg" alt=""><span class="name">Road Rider</span></a>
-    <a class="game" href="rallyrun/index.html"><img src="img/rallyrun.svg" alt=""><span class="name">Rally Run</span></a>
-    <a class="game" href="highwayhero/index.html"><img src="img/highwayhero.svg" alt=""><span class="name">Highway Hero</span></a>
+    <div class="game-card" data-game="tetris" data-category="classics">
+      <div class="tile">
+        <a class="game" href="tetris/index.html"><img src="img/tetris.png" alt=""><span class="name">Tetris</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Tetris">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Tetris">★</button>
+          <button type="button" class="share" aria-label="Share Tetris">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="snake" data-category="classics">
+      <div class="tile">
+        <a class="game" href="snake/index.html"><img src="img/snake.png" alt=""><span class="name">Snake</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Snake">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Snake">★</button>
+          <button type="button" class="share" aria-label="Share Snake">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="breakout" data-category="classics">
+      <div class="tile">
+        <a class="game" href="breakout/index.html"><img src="img/breakout.png" alt=""><span class="name">Breakout</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Breakout">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Breakout">★</button>
+          <button type="button" class="share" aria-label="Share Breakout">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="invaders" data-category="classics">
+      <div class="tile">
+        <a class="game" href="invaders/index.html"><img src="img/space_invaders.png" alt=""><span class="name">Space Invaders</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Space Invaders">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Space Invaders">★</button>
+          <button type="button" class="share" aria-label="Share Space Invaders">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="asteroids" data-category="classics">
+      <div class="tile">
+        <a class="game" href="asteroids/index.html"><img src="img/asteroids.png" alt=""><span class="name">Asteroids</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Asteroids">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Asteroids">★</button>
+          <button type="button" class="share" aria-label="Share Asteroids">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="pong" data-category="classics">
+      <div class="tile">
+        <a class="game" href="pong/index.html"><img src="img/pong1.png" alt=""><span class="name">Pong</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Pong">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Pong">★</button>
+          <button type="button" class="share" aria-label="Share Pong">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="frogger" data-category="classics">
+      <div class="tile">
+        <a class="game" href="frogger/index.html"><img src="img/frogger.png" alt=""><span class="name">Frogger</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Frogger">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Frogger">★</button>
+          <button type="button" class="share" aria-label="Share Frogger">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="pacman" data-category="classics">
+      <div class="tile">
+        <a class="game" href="pacman/index.html"><img src="img/pacman.png" alt=""><span class="name">Pac-Man</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Pac-Man">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Pac-Man">★</button>
+          <button type="button" class="share" aria-label="Share Pac-Man">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="2048" data-category="puzzle">
+      <div class="tile">
+        <a class="game" href="2048/index.html"><img src="img/2048.png" alt=""><span class="name">2048</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like 2048">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark 2048">★</button>
+          <button type="button" class="share" aria-label="Share 2048">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="simon" data-category="puzzle">
+      <div class="tile">
+        <a class="game" href="simon/index.html"><img src="img/simon.png" alt=""><span class="name">Simon</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Simon">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Simon">★</button>
+          <button type="button" class="share" aria-label="Share Simon">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="memory" data-category="puzzle">
+      <div class="tile">
+        <a class="game" href="memory/index.html"><img src="img/memory.webp" alt=""><span class="name">Memory</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Memory">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Memory">★</button>
+          <button type="button" class="share" aria-label="Share Memory">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="fifteen" data-category="puzzle">
+      <div class="tile">
+        <a class="game" href="fifteen/index.html"><img src="img/fifteen.webp" alt=""><span class="name">15 Puzzle</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like 15 Puzzle">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark 15 Puzzle">★</button>
+          <button type="button" class="share" aria-label="Share 15 Puzzle">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="minesweeper" data-category="puzzle">
+      <div class="tile">
+        <a class="game" href="minesweeper/index.html"><img src="img/minesweeper.webp" alt=""><span class="name">Minesweeper</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Minesweeper">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Minesweeper">★</button>
+          <button type="button" class="share" aria-label="Share Minesweeper">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="connect4" data-category="puzzle">
+      <div class="tile">
+        <a class="game" href="connect4/index.html"><img src="img/connect4.webp" alt=""><span class="name">Connect Four</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Connect Four">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Connect Four">★</button>
+          <button type="button" class="share" aria-label="Share Connect Four">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="sokoban" data-category="puzzle">
+      <div class="tile">
+        <a class="game" href="sokoban/index.html"><img src="img/sokoban.webp" alt=""><span class="name">Sokoban</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Sokoban">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Sokoban">★</button>
+          <button type="button" class="share" aria-label="Share Sokoban">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="skyhop" data-category="action">
+      <div class="tile">
+        <a class="game" href="skyhop/index.html"><img src="img/skyhop.webp" alt=""><span class="name">Sky Hop</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Sky Hop">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Sky Hop">★</button>
+          <button type="button" class="share" aria-label="Share Sky Hop">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="whackamole" data-category="action">
+      <div class="tile">
+        <a class="game" href="whackamole/index.html"><img src="img/whackamole.webp" alt=""><span class="name">Whack-a-Mole</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Whack-a-Mole">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Whack-a-Mole">★</button>
+          <button type="button" class="share" aria-label="Share Whack-a-Mole">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="lunarlander" data-category="action">
+      <div class="tile">
+        <a class="game" href="lunarlander/index.html"><img src="img/lunarlander.webp" alt=""><span class="name">Lunar Lander</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Lunar Lander">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Lunar Lander">★</button>
+          <button type="button" class="share" aria-label="Share Lunar Lander">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="missilecommand" data-category="action">
+      <div class="tile">
+        <a class="game" href="missilecommand/index.html"><img src="img/missilecommand.webp" alt=""><span class="name">Missile Command</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Missile Command">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Missile Command">★</button>
+          <button type="button" class="share" aria-label="Share Missile Command">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="roadrider" data-category="racing">
+      <div class="tile">
+        <a class="game" href="roadrider/index.html"><img src="img/roadrider.webp" alt=""><span class="name">Road Rider</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Road Rider">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Road Rider">★</button>
+          <button type="button" class="share" aria-label="Share Road Rider">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="rallyrun" data-category="racing">
+      <div class="tile">
+        <a class="game" href="rallyrun/index.html"><img src="img/rallyrun.webp" alt=""><span class="name">Rally Run</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Rally Run">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Rally Run">★</button>
+          <button type="button" class="share" aria-label="Share Rally Run">↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="game-card" data-game="highwayhero" data-category="racing">
+      <div class="tile">
+        <a class="game" href="highwayhero/index.html"><img src="img/highwayhero.webp" alt=""><span class="name">Highway Hero</span></a>
+        <div class="metrics" data-metrics><span>0 views</span><span>0 plays</span><span>♡ 0</span><span>best –</span></div>
+        <div class="tile-actions">
+          <button type="button" class="like" aria-pressed="false" aria-label="Like Highway Hero">♡</button>
+          <button type="button" class="bookmark" aria-pressed="false" aria-label="Bookmark Highway Hero">★</button>
+          <button type="button" class="share" aria-label="Share Highway Hero">↗</button>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -255,6 +544,90 @@
 
   btn.addEventListener("click", () => {
     setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+<script>
+(() => {
+  const cards = Array.from(document.querySelectorAll(".game-card"));
+  let remote = { views: {}, plays: {}, likes: {}, bests: {} };
+
+  function fmt(n) {
+    n = Number(n) || 0;
+    return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+  }
+
+  function state() {
+    return window.ArcadeMetrics ? window.ArcadeMetrics.state()
+      : { views: {}, plays: {}, likes: {}, bookmarks: {}, bests: {} };
+  }
+
+  function render() {
+    const s = state();
+    cards.forEach(card => {
+      const g = card.dataset.game;
+      const views = (remote.views && remote.views[g]) || s.views[g] || 0;
+      const plays = (remote.plays && remote.plays[g]) || s.plays[g] || 0;
+      const likes = (remote.likes && remote.likes[g]) || s.likes[g] || 0;
+      const best = (remote.bests && remote.bests[g]) || s.bests[g];
+      const m = card.querySelector("[data-metrics]");
+      if (m) m.innerHTML = "<span>" + fmt(views) + " views</span><span>" + fmt(plays) +
+        " plays</span><span>♡ " + fmt(likes) + "</span><span>best " + (best ? fmt(best) : "–") + "</span>";
+      const like = card.querySelector(".like");
+      const mark = card.querySelector(".bookmark");
+      if (like) like.setAttribute("aria-pressed", String(!!s.likes[g] && s.likes[g] > 0));
+      if (mark) mark.setAttribute("aria-pressed", String(!!s.bookmarks[g]));
+    });
+  }
+
+  document.querySelectorAll(".filter").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".filter").forEach(b => b.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+      const f = btn.dataset.filter;
+      cards.forEach(card => {
+        card.style.display = (f === "all" || card.dataset.category === f) ? "" : "none";
+      });
+    });
+  });
+
+  cards.forEach(card => {
+    const g = card.dataset.game;
+    const name = card.querySelector(".name") ? card.querySelector(".name").textContent : g;
+    const like = card.querySelector(".like");
+    if (like) like.addEventListener("click", e => {
+      e.preventDefault();
+      const on = like.getAttribute("aria-pressed") !== "true";
+      if (window.ArcadeMetrics) window.ArcadeMetrics.like(g, on ? 1 : 0);
+      render();
+    });
+    const mark = card.querySelector(".bookmark");
+    if (mark) mark.addEventListener("click", e => {
+      e.preventDefault();
+      const on = mark.getAttribute("aria-pressed") !== "true";
+      if (window.ArcadeMetrics) window.ArcadeMetrics.bookmark(g, on);
+      render();
+    });
+    const share = card.querySelector(".share");
+    if (share) share.addEventListener("click", async e => {
+      e.preventDefault();
+      const url = location.href.split("#")[0].replace(/[^/]*$/, "") + g + "/index.html";
+      try {
+        if (navigator.share) await navigator.share({ title: name + " — Retro Arcade", url });
+        else if (navigator.clipboard) { await navigator.clipboard.writeText(url); share.textContent = "✓"; setTimeout(() => { share.textContent = "↗"; }, 1200); }
+        else location.href = "mailto:?subject=" + encodeURIComponent(name) + "&body=" + encodeURIComponent(url);
+      } catch (_) {}
+    });
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    render();
+    if (location.protocol === "http:" || location.protocol === "https:") {
+      fetch("/api/metrics").then(r => r.ok ? r.json() : null).then(data => {
+        if (data) { remote = data; render(); }
+      }).catch(() => {});
+    }
+    window.addEventListener("arcade-metrics-updated", render);
   });
 })();
 </script>

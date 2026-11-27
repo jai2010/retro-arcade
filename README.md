@@ -50,6 +50,26 @@ No internet connection is required.
   tooltip appears on phones and closes with its × button; it is shown again on the next
   visit. Keyboard controls and button pads still work on larger screens.
 - The home page uses local thumbnails in `img/`: PNGs cropped from the supplied
-  illustration grid for the original games, and matching SVG thumbnails for the
-  newer ones. Nothing is fetched over the network.
-- No external fonts, images, audio, libraries or network calls are used.
+  illustration grid for the original games, generated WebP art for the later games,
+  and matching SVG art where no generated image was supplied. Nothing is fetched
+  over the network to play.
+- Memory, 15 Puzzle, Minesweeper and Lunar Lander have multiple levels with
+  per-level best scores.
+- No external fonts, images, audio, libraries or network calls are needed to play.
+
+## Metrics, sharing and admin
+
+- Usage is recorded offline first in `localStorage`: views, plays, likes, bookmarks
+  and best scores. `metrics.js` queues events on every device, and sends the queue
+  to `/api/metrics` when the device is online and a sync server is configured.
+- Home-page tiles show views, plays, likes and best score, with like, bookmark
+  (star) and share buttons. Tiles can be filtered by category: All, Classics,
+  Puzzle, Action and Racing.
+- For local development, run `npm install` then `npm start` and open
+  `http://localhost:3000`. The admin panel is at `/admin.html` (default password
+  `arcade-admin`, override with `ADMIN_PASSWORD`).
+- On Vercel, deploy this folder as the project root. Set `ADMIN_PASSWORD` for the
+  admin gate and `BLOB_READ_WRITE_TOKEN` for persistent metric storage (Vercel Blob).
+  `api/metrics.js` receives events, `api/admin.js` serves the password-protected
+  admin table and CSV export, and the admin page can store the deployed base URL
+  in each browser so offline copies sync when they reconnect.

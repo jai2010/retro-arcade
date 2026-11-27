@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="../metrics.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Memory</title>
 <style>
@@ -54,6 +55,8 @@
   .chip.best b { color:var(--accent); }
   .board-wrap { position:relative; aspect-ratio:1/1; width:100%; background:var(--sand); border:2px solid var(--ink); border-radius:var(--radius); box-shadow:0 10px 24px rgba(32,38,43,0.14); padding:8px; }
   canvas { display:block; width:100%; height:100%; border-radius:var(--radius-sm); background:#fffdfa; touch-action:none; }
+  .next-level { position:absolute; left:50%; top:calc(50% + 46px); transform:translateX(-50%); z-index:3; white-space:nowrap; }
+  .next-level[hidden] { display:none; }
   .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
   .side { width:100%; display:flex; flex-direction:column; gap:clamp(8px,1.3vh,14px); max-height:calc(100dvh - 120px); overflow-y:auto; padding-right:2px; }
   .panel { background:var(--surface); border:2px solid var(--ink); border-radius:var(--radius); box-shadow:0 6px 16px rgba(32,38,43,0.10); padding:clamp(9px,1.3vh,14px); }
@@ -86,6 +89,8 @@
   html.no-touch-pad .game { grid-template-columns:1fr !important; grid-template-rows:1fr !important; align-items:stretch !important; }
   html.no-touch-pad .play { width:100% !important; height:100%; justify-content:flex-start; }
   html.no-touch-pad .play .hud { width:100% !important; }
+  html.no-touch-pad .hud .chips { flex-wrap:nowrap !important; gap:4px !important; }
+  html.no-touch-pad .chip { font-size:9px !important; padding:3px 6px !important; }
   html.no-touch-pad .board-wrap, html.no-touch-pad .board-width { width:min(100%,calc((100dvh - 170px) * 1.0000)) !important; margin-inline:auto !important; }
   html.no-touch-pad .side { display:none !important; }
   html.no-touch-pad .gesture-tip {
@@ -138,6 +143,7 @@
       <div class="hud" aria-live="polite">
         <div class="score-block"><span class="score-label">Moves</span><strong id="score">0</strong></div>
         <div class="chips">
+          <span class="chip">Level <b id="level">1/3</b></span>
           <span class="chip">Pairs <b id="pairs">0/8</b></span>
           <span class="chip">Time <b id="time">0s</b></span>
           <span class="chip best">Best <b id="best">0</b></span>
@@ -146,6 +152,7 @@
 
       <div class="board-wrap">
         <canvas id="game" tabindex="0" role="img" aria-label="Memory playfield, 4 by 4 grid of cards">Your browser does not support canvas.</canvas>
+        <button id="nextBtn" class="next-level primary" type="button" hidden>Next level</button>
       </div>
       <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
         <span>Tap two cards to find a match</span>
@@ -156,8 +163,8 @@
     <aside class="side" aria-label="Instructions">
       <section class="panel">
         <h2>How to play</h2>
-        <p class="help">Tap a card to reveal the symbol underneath, then tap another to find its twin. Every pair you flip counts as a move. Clear all eight pairs in as few moves as you can.</p>
-        <p class="hint">Desktop: arrow keys move, Enter flips, P pauses, R restarts.</p>
+        <p class="help">Three levels: 8, 12 then 18 pairs, each with a shorter preview. Flip two cards at a time to find a twin; clear a board to move on.</p>
+        <p class="hint">Fewest moves wins, and each level keeps its own best score.</p>
         <p class="record">Fewest moves <b id="sideBest">0</b></p>
       </section>
     </aside>
@@ -199,8 +206,13 @@
     }
   }
 
-  const GRID = 4;
-  const PAIRS = (GRID * GRID) / 2;
+  const LEVELS = [
+    { cols: 4, rows: 4, preview: 2000 },
+    { cols: 4, rows: 6, preview: 1500 },
+    { cols: 6, rows: 6, preview: 1000 }
+  ];
+  let level = 1;
+  let COLS = 4, ROWS = 4, PAIRS = 8;
   const KEY = "memory.best.v1";
   // Illustration palette, shared with the arcade thumbnails.
   const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
@@ -209,55 +221,100 @@
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const scoreEl = document.getElementById("score");
+  const levelEl = document.getElementById("level");
   const pairsEl = document.getElementById("pairs");
   const timeEl = document.getElementById("time");
   const bestEl = document.getElementById("best");
   const sideBestEl = document.getElementById("sideBest");
   const pauseBtn = document.getElementById("pauseBtn");
+  const nextBtn = document.getElementById("nextBtn");
   const announceEl = document.getElementById("announce");
 
   let W = 300, H = 300;
   let deck = [], moves = 0, matched = 0, elapsed = 0;
-  let best = loadBest(), phase = "idle", paused = false, newRecord = false;
+  let bestData = { 1: 0, 2: 0, 3: 0 };
+  let phase = "idle", paused = false, newRecord = false;
   let first = null, second = null, pending = null;
+  let previewLeft = 0;
   let cursor = 0;
   let lastTime = performance.now();
 
-  function loadBest() {
-    try {
-      const v = Number(window.localStorage.getItem(KEY));
-      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
-    } catch (_) { return 0; }
+  function normaliseBest(raw) {
+    const out = { 1: 0, 2: 0, 3: 0 };
+    if (typeof raw === "number" && Number.isFinite(raw)) { out[1] = Math.max(0, Math.floor(raw)); return out; }
+    if (raw && typeof raw === "object") {
+      for (let n = 1; n <= LEVELS.length; n++) {
+        const v = Number(raw[n]);
+        if (Number.isFinite(v) && v > 0) out[n] = Math.floor(v);
+      }
+    }
+    return out;
   }
-  function saveBest(v) {
-    try { window.localStorage.setItem(KEY, String(v)); } catch (_) {}
+  function loadBest() {
+    let raw = null;
+    try {
+      const stored = window.localStorage.getItem(KEY);
+      if (stored) raw = JSON.parse(stored);
+    } catch (_) { return bestData; }
+    bestData = normaliseBest(raw);
+    return bestData;
+  }
+  function saveBest(n, v) {
+    bestData[n] = v;
+    try { window.localStorage.setItem(KEY, JSON.stringify(bestData)); } catch (_) {}
   }
   function announce(text) { announceEl.textContent = text; }
   function updateStats() {
     scoreEl.textContent = String(moves);
+    levelEl.textContent = level + "/" + LEVELS.length;
     pairsEl.textContent = matched + "/" + PAIRS;
     timeEl.textContent = Math.floor(elapsed) + "s";
+    const best = bestData[level] || 0;
     bestEl.textContent = String(best);
     sideBestEl.textContent = String(best);
   }
 
+  function configureLevel(n) {
+    level = n;
+    const cfg = LEVELS[n - 1];
+    COLS = cfg.cols; ROWS = cfg.rows; PAIRS = (COLS * ROWS) / 2;
+    canvas.setAttribute("aria-label", "Memory playfield, " + ROWS + " by " + COLS + " grid of cards");
+  }
+
   function reset() {
+    configureLevel(level);
     const ids = [];
     for (let i = 0; i < PAIRS; i++) { ids.push(i); ids.push(i); }
     for (let i = ids.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       const tmp = ids[i]; ids[i] = ids[j]; ids[j] = tmp;
     }
-    deck = ids.map(id => ({ id: id, faceUp: false, matched: false, flip: 0 }));
+    deck = ids.map(id => ({ id: id, faceUp: true, matched: false, flip: 1 }));
     moves = 0; matched = 0; elapsed = 0;
-    phase = "idle"; paused = false; newRecord = false;
+    phase = "preview"; paused = false; newRecord = false;
     first = null; second = null; pending = null; cursor = 0;
+    previewLeft = LEVELS[level - 1].preview;
+    nextBtn.hidden = true;
     pauseBtn.textContent = "Pause";
     pauseBtn.setAttribute("aria-pressed", "false");
     updateStats();
-    announce("New game. Tap a card to start.");
+    announce("Level " + level + " of " + LEVELS.length + ". Watch the preview.");
     canvas.focus({ preventScroll: true });
     draw();
+  }
+
+  function endPreview() {
+    previewLeft = 0;
+    if (phase !== "preview") return;
+    deck.forEach(card => { card.faceUp = false; });
+    phase = "idle";
+    announce("Preview over. Tap a card to start.");
+  }
+
+  function advance() {
+    if (phase !== "won") return;
+    level = level < LEVELS.length ? level + 1 : 1;
+    reset();
   }
 
   function togglePause() {
@@ -270,9 +327,12 @@
 
   function finish() {
     phase = "won";
-    if (best === 0 || moves < best) { best = moves; saveBest(best); newRecord = true; }
+    const best = bestData[level] || 0;
+    if (best === 0 || moves < best) { saveBest(level, moves); newRecord = true; }
     updateStats();
-    announce("You win! " + moves + " moves in " + Math.floor(elapsed) + " seconds.");
+    nextBtn.textContent = level === LEVELS.length ? "Play again" : "Next level";
+    nextBtn.hidden = false;
+    announce("Level " + level + " clear! " + moves + " moves in " + Math.floor(elapsed) + " seconds.");
   }
 
   function resolvePair() {
@@ -292,7 +352,7 @@
   }
 
   function flip(index) {
-    if (index < 0 || index >= deck.length || paused || phase === "won") return;
+    if (index < 0 || index >= deck.length || paused || phase === "won" || phase === "preview") return;
     if (pending) return;
     const card = deck[index];
     if (card.faceUp || card.matched) return;
@@ -313,6 +373,10 @@
 
   function tick(dt) {
     if (phase === "playing" && !paused) elapsed += dt / 1000;
+    if (phase === "preview" && !paused) {
+      previewLeft -= dt;
+      if (previewLeft <= 0) endPreview();
+    }
     if (pending && !paused) {
       pending.left -= dt;
       if (pending.left <= 0) resolvePair();
@@ -440,13 +504,13 @@
   }
 
   // Eight distinctive dot patterns below the star keep matches readable.
-  function drawFaceMarks(id, cy, w) {
+  function drawFaceMarks(id, cy, w, h) {
     ctx.fillStyle = INK;
     const count = id + 1;
     const perRow = count > 4 ? Math.ceil(count / 2) : count;
     const rows = count > 4 ? 2 : 1;
-    const gap = w * 0.1;
-    const dotR = Math.max(1.6, w * 0.022);
+    const gap = Math.min(w, h) * 0.1;
+    const dotR = Math.max(1.6, Math.min(w, h) * 0.022);
     let left = count;
     for (let row = 0; row < rows; row++) {
       const n = Math.min(perRow, left);
@@ -460,23 +524,23 @@
     }
   }
 
-  function drawCard(card, x, y, size, index) {
-    const pad = size * 0.05;
-    const w = size - pad * 2;
-    const h = size - pad * 2;
-    const radius = size * 0.1;
+  function drawCard(card, x, y, cw, ch, index) {
+    const padX = cw * 0.05, padY = ch * 0.05;
+    const w = cw - padX * 2;
+    const h = ch - padY * 2;
+    const radius = Math.min(cw, ch) * 0.1;
     const scale = Math.max(0.02, Math.abs(Math.cos(card.flip * Math.PI)));
     ctx.save();
-    ctx.translate(x + size / 2, y + size / 2);
+    ctx.translate(x + cw / 2, y + ch / 2);
     ctx.scale(scale, 1);
     const bx = -w / 2, by = -h / 2;
 
     if (card.faceUp) {
       paintCard(bx, by, w, h, radius, CREAM, PAPER);
       drawStar(0, -h * 0.05, Math.min(w, h) * 0.27);
-      drawFaceMarks(card.id, h * 0.27, w);
+      drawFaceMarks(card.id, h * 0.27, w, h);
     } else {
-      const colour = (Math.floor(index / GRID) + index % GRID) % 2 === 0 ? TEAL : CORAL;
+      const colour = (Math.floor(index / COLS) + index % COLS) % 2 === 0 ? TEAL : CORAL;
       paintCard(bx, by, w, h, radius, colour);
       drawCardBack(w, h, radius, colour, index);
     }
@@ -486,32 +550,37 @@
   function draw() {
     ctx.fillStyle = PAPER;
     ctx.fillRect(0, 0, W, H);
-    const cw = W / GRID, ch = H / GRID;
+    const cw = W / COLS, ch = H / ROWS;
 
     ctx.strokeStyle = "rgba(32,38,43,0.10)";
     ctx.lineWidth = 1.5;
-    for (let i = 1; i < GRID; i++) {
+    for (let i = 1; i < COLS; i++) {
       ctx.beginPath(); ctx.moveTo(i * cw + .5, 0); ctx.lineTo(i * cw + .5, H); ctx.stroke();
+    }
+    for (let i = 1; i < ROWS; i++) {
       ctx.beginPath(); ctx.moveTo(0, i * ch + .5); ctx.lineTo(W, i * ch + .5); ctx.stroke();
     }
 
     if (!isPhone) {
-      const r = Math.floor(cursor / GRID), c = cursor % GRID;
-      roundRect(c * cw + cw * 0.02, r * ch + ch * 0.02, cw * 0.96, ch * 0.96, cw * 0.12);
+      const r = Math.floor(cursor / COLS), c = cursor % COLS;
+      roundRect(c * cw + cw * 0.02, r * ch + ch * 0.02, cw * 0.96, ch * 0.96, Math.min(cw, ch) * 0.12);
       ctx.strokeStyle = CORAL;
       ctx.lineWidth = 3;
       ctx.stroke();
     }
 
     deck.forEach((card, i) => {
-      const r = Math.floor(i / GRID), c = i % GRID;
-      drawCard(card, c * cw, r * ch, cw, i);
+      const r = Math.floor(i / COLS), c = i % COLS;
+      drawCard(card, c * cw, r * ch, cw, ch, i);
     });
 
     if (paused || phase === "won") {
-      const title = phase === "won" ? (newRecord ? "New record!" : "You win!") : "Paused";
+      const finalWin = phase === "won" && level === LEVELS.length;
+      const title = phase === "won"
+        ? (finalWin ? "All levels clear!" : newRecord ? "New record!" : "You win!")
+        : "Paused";
       const hint = phase === "won"
-        ? moves + " moves · " + Math.floor(elapsed) + "s — " + (isPhone ? "tap to play again" : "press R or tap to play again")
+        ? "Level " + level + " · " + moves + " moves · " + Math.floor(elapsed) + "s"
         : "Tap Pause to resume";
       drawOverlay(title, hint);
     }
@@ -529,35 +598,37 @@
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
     if (x < 0 || y < 0 || x > rect.width || y > rect.height) return -1;
-    const c = Math.min(GRID - 1, Math.floor(x / (rect.width / GRID)));
-    const r = Math.min(GRID - 1, Math.floor(y / (rect.height / GRID)));
-    return r * GRID + c;
+    const c = Math.min(COLS - 1, Math.floor(x / (rect.width / COLS)));
+    const r = Math.min(ROWS - 1, Math.floor(y / (rect.height / ROWS)));
+    return r * COLS + c;
   }
 
   canvas.addEventListener("pointerdown", e => {
     const cell = cellAt(e);
     if (cell < 0) return;
     cursor = cell;
-    if (phase === "won") { reset(); return; }
+    if (phase === "won") { advance(); return; }
     flip(cell);
   });
 
+  nextBtn.addEventListener("click", advance);
   pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
   document.getElementById("newBtn").addEventListener("click", reset);
 
   window.addEventListener("keydown", e => {
     if (phoneMode.matches) return;
     const key = e.key;
-    if (key === "ArrowLeft" || key === "a" || key === "A") { e.preventDefault(); cursor = Math.floor(cursor / GRID) * GRID + Math.max(0, cursor % GRID - 1); return; }
-    if (key === "ArrowRight" || key === "d" || key === "D") { e.preventDefault(); cursor = Math.floor(cursor / GRID) * GRID + Math.min(GRID - 1, cursor % GRID + 1); return; }
-    if (key === "ArrowUp" || key === "w" || key === "W") { e.preventDefault(); cursor = Math.max(0, cursor - GRID); return; }
-    if (key === "ArrowDown" || key === "s" || key === "S") { e.preventDefault(); cursor = Math.min(GRID * GRID - 1, cursor + GRID); return; }
-    if (key === "Enter" || key === " ") { e.preventDefault(); if (phase === "won") reset(); else flip(cursor); return; }
+    if (key === "ArrowLeft" || key === "a" || key === "A") { e.preventDefault(); cursor = Math.floor(cursor / COLS) * COLS + Math.max(0, cursor % COLS - 1); return; }
+    if (key === "ArrowRight" || key === "d" || key === "D") { e.preventDefault(); cursor = Math.floor(cursor / COLS) * COLS + Math.min(COLS - 1, cursor % COLS + 1); return; }
+    if (key === "ArrowUp" || key === "w" || key === "W") { e.preventDefault(); cursor = Math.max(0, cursor - COLS); return; }
+    if (key === "ArrowDown" || key === "s" || key === "S") { e.preventDefault(); cursor = Math.min(COLS * ROWS - 1, cursor + COLS); return; }
+    if (e.target && e.target.closest && e.target.closest("button, a")) return;
+    if (key === "Enter" || key === " ") { e.preventDefault(); if (phase === "won") advance(); else flip(cursor); return; }
     if (key === "p" || key === "P") { e.preventDefault(); togglePause(); return; }
     if (key === "r" || key === "R") { e.preventDefault(); reset(); }
   });
 
-  best = loadBest();
+  loadBest();
   lastTime = performance.now();
   resize();
   reset();
