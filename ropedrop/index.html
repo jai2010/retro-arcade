@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../metrics.js" defer></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rope Drop</title>
+<style>
+  :root { --paper:#f7f4ee; --ink:#20262b; --muted:rgba(32,38,43,.62); --accent:#e5724c; --accent-dark:#20262b; --teal:#3f9b91; --sand:#ede7dc; --line:#ede7dc; --surface:#fffdfa; --radius:12px; --radius-sm:8px; --retro-font:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background-color:var(--paper);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.05'/%3E%3C/svg%3E");color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;overflow:hidden}
+  .shell{--board-w:min(calc((100dvh - 170px) * 0.7600),620px);--side-w:270px;--gap:clamp(12px,2vw,24px);--content-w:calc(var(--board-w) + var(--gap) + var(--side-w));height:100dvh;max-width:1080px;margin:0 auto;padding:clamp(10px,1.8vh,22px) clamp(14px,2vw,30px) clamp(10px,1.6vh,18px);display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:clamp(8px,1.4vh,16px)}
+  header.top,.game{width:min(100%,var(--content-w));margin-inline:auto}
+  header.top{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+  h1{margin:0;font-size:clamp(24px,3.4vw,38px);letter-spacing:-.02em;line-height:1.15}
+  .tagline{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  button{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius-sm);box-shadow:0 2px 0 rgba(32,38,43,.18);padding:8px 14px;min-height:44px;cursor:pointer;transition:transform 120ms ease,box-shadow 120ms ease,border-color 120ms ease,background 120ms ease}
+  button:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(32,38,43,0.10);border-color:var(--teal)}
+  button:active{transform:translateY(1px);box-shadow:none}
+  button.primary{background:var(--accent);border-color:var(--ink);color:#fffdfa}
+  button.primary:hover{background:var(--accent-dark)}
+  .actions a.back{display:inline-flex;align-items:center;justify-content:center;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius-sm);box-shadow:0 2px 0 rgba(32,38,43,.18);padding:8px 14px;min-height:44px;text-decoration:none;transition:transform 120ms ease,box-shadow 120ms ease,border-color 120ms ease}
+  .actions a.back:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(32,38,43,0.10);border-color:var(--teal)}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .game{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,var(--board-w)) var(--side-w);gap:var(--gap);align-items:center}
+  .play{display:flex;flex-direction:column;gap:clamp(6px,1vh,10px);min-height:0;width:var(--board-w)}
+  .board-width{width:var(--board-w)}
+  .hud{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius)}
+  .score-block{display:flex;align-items:baseline;gap:8px}
+  .score-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+  #score{font-size:clamp(24px,3.2vh,36px);line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .chip{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--sand);border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .chip b{color:var(--ink);font-variant-numeric:tabular-nums} .chip.best b{color:var(--accent)} 
+  .board-wrap{position:relative;aspect-ratio:342/450;background:var(--sand);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 10px 24px rgba(32,38,43,0.14);padding:8px}
+  canvas.board{display:block;width:100%;height:100%;border-radius:var(--radius-sm);background:#fffdfa;touch-action:none;}
+  .side{width:100%;display:flex;flex-direction:column;gap:clamp(8px,1.3vh,14px);max-height:calc(100dvh - 120px);overflow-y:auto;padding-right:2px}
+  .panel{background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 6px 16px rgba(32,38,43,0.10);padding:clamp(9px,1.3vh,14px)}
+  .panel h2{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .legend{font-size:12px} .legend div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+  kbd{font:inherit;font-size:11px;background:var(--sand);border:2px solid var(--ink);border-bottom-width:2px;border-radius:5px;padding:1px 5px;white-space:nowrap}
+  .help,.hint,.record{margin:0;color:var(--muted);font-size:12px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media(max-width:760px){body{overflow:auto}.shell{height:auto;min-height:100dvh}header.top,.game{width:100%}header.top{align-items:flex-start;flex-direction:column}.game{grid-template-columns:1fr;align-items:start}.play{width:100%}.board-width{width:min(100%,calc((100dvh - 220px) * 0.7600)) !important;margin-inline:auto}.play .hud{width:100%}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none;overflow:visible}.side .panel:last-child{grid-column:1/-1}}
+  @media(max-height:620px) and (min-width:761px){.tagline{display:none}h1{font-size:24px}.side{gap:6px}.panel{padding:8px}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0.01ms!important}}
+  /* Shared arcade header and retro typography */
+  body{font-family:var(--retro-font);font-size:13px}
+  header,header.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-direction:row!important;align-items:center!important;min-height:52px;padding-bottom:10px;border-bottom:2px solid var(--ink)}
+  header h1{font-family:var(--retro-font);font-size:24px;line-height:1;text-transform:uppercase;letter-spacing:.08em;margin:0}
+  header .tagline{margin:4px 0 0;font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44ch;text-transform:uppercase;letter-spacing:.05em}
+  header .actions{flex-wrap:nowrap}
+  .panel h2,.chip,.score-label,kbd,.keys,.name,.title,.desc{font-family:var(--retro-font);letter-spacing:.05em}
+  .panel h2,.chip,.score-label,.keys{text-transform:uppercase}
+  button,.actions a.back{font-family:var(--retro-font);text-transform:uppercase;letter-spacing:.05em;font-size:12px}
+  /* Arcade lighting: shared with the home page */
+  body[data-theme="dark"]{--paper:#171b1e;--ink:#f7f4ee;--muted:#aab2b7;--line:rgba(247,244,238,.22);--surface:#20262b;--sand:#2b3237}
+  body{background-color:var(--paper);background-image:radial-gradient(circle at 50% -10%,rgba(229,114,76,.10),transparent 60%),radial-gradient(rgba(128,128,128,.055) .7px,transparent .7px);background-size:auto,6px 6px;transition:background-color 200ms ease,color 200ms ease}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;background:repeating-linear-gradient(180deg,rgba(128,128,128,.035) 0 1px,transparent 1px 4px)}
+  .shell{position:relative;z-index:1}
+  .joystick{width:44px;height:44px;min-height:44px;padding:0;border-radius:50%;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;cursor:pointer;text-transform:none}
+  .joystick .stick{display:block;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid rgba(32,38,43,.65);transform:translateY(-5px);transition:transform 180ms ease}
+  .joystick[aria-checked="true"] .stick{transform:translateY(5px)} .joystick:hover{border-color:var(--accent)}
+  /* Phone-first play: no keyboard prompts and no button panels. */
+  @media(max-width:760px){header .tagline{display:none!important}header h1{font-size:18px!important}.actions{flex-wrap:nowrap!important;justify-content:flex-end!important;gap:4px!important}.actions button,.actions a.back{min-height:36px!important;padding:5px 7px!important;font-size:10px!important}.joystick{width:40px!important;height:40px!important;min-height:40px!important}.hud{padding:6px 10px!important;gap:6px!important}.chip{font-size:10px!important;padding:3px 7px!important}.legend,.help,.hint{display:none!important}.shell{padding-bottom:24px!important}}
+  /* Phone layout: fit the board to the viewport; draw the rest from the canvas. */
+  .gesture-tip{display:none}
+  html.no-touch-pad .shell{max-width:none!important;padding:8px 4px 14px!important}
+  html.no-touch-pad header,html.no-touch-pad .game{width:100%!important;max-width:none!important}
+  html.no-touch-pad .game{grid-template-columns:1fr!important;grid-template-rows:1fr!important;align-items:stretch!important}
+  html.no-touch-pad .play{width:100%!important;height:100%;justify-content:flex-start}
+  html.no-touch-pad .play .hud{width:100%!important}
+  html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 170px) * 0.7600))!important;margin-inline:auto!important}
+  html.no-touch-pad .side{display:none!important}
+  html.no-touch-pad .gesture-tip{display:none;position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;align-items:center;gap:12px;width:min(92vw,420px);max-width:min(92vw,420px);padding:9px 10px 9px 14px;border:1px solid rgba(128,128,128,.35);border-radius:14px;background:var(--surface,#fffdfa);box-shadow:0 8px 24px rgba(0,0,0,.25);color:var(--muted,currentColor);font:12px/1.35 var(--retro-font,monospace);text-align:center}
+  html.no-touch-pad .gesture-tip.is-open{display:flex}
+  .tip-close{flex:0 0 auto;width:30px;height:30px;padding:0;border:1px solid rgba(128,128,128,.35);border-radius:50%;background:transparent;color:inherit;font:18px/1 monospace;cursor:pointer}
+  @media(max-height:520px) and (pointer:coarse){html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 140px) * 0.7600))!important}}
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
+
+  /* Gesture play: no text selection, callout or highlight while dragging. */
+  html, body, .shell, .play, .board-wrap, canvas, .gesture-tip {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .board-wrap, canvas { touch-action: none; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div>
+      <h1>Rope Drop</h1>
+      <p class="tagline">Cut the rope. Drop the candy. Fill the dish.</p>
+    </div>
+    <div class="actions">
+      <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights"><span class="stick" aria-hidden="true"></span></button>
+      <a class="back" href="../index.html" aria-label="Back to arcade">← Arcade</a>
+      <button id="pauseBtn" type="button" aria-pressed="false">Pause</button>
+      <button id="newBtn" class="primary" type="button">New game</button>
+    </div>
+  </header>
+
+  <main class="game">
+    <section class="play" aria-label="Game">
+      <div class="hud board-width" aria-live="polite">
+        <div class="score-block"><span class="score-label">Stars</span><strong id="score">0</strong></div>
+        <div class="chips">
+          <span class="chip">Level <b id="level">1/3</b></span>
+          <span class="chip">Cuts <b id="cuts">0</b></span>
+          <span class="chip best">Best <b id="best">—</b></span>
+        </div>
+      </div>
+
+      <div class="board-wrap board-width">
+        <canvas id="game" class="board" tabindex="0" role="img" aria-label="Rope Drop playfield: cut the teal rope and land the gold candy in the coral dish">Your browser does not support canvas.</canvas>
+      </div>
+      <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
+        <span>Tap a rope to cut it · Tap Pause to pause</span>
+        <button type="button" class="tip-close" aria-label="Close controls tip">×</button>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Instructions">
+      <section class="panel">
+        <h2>Rules</h2>
+        <p class="help">A gold candy hangs on a teal rope. Cut a rope segment to free it, let it swing and bounce off the obstacles, then land it in the coral dish. Cream stars are a bonus.</p>
+      </section>
+      <section class="panel">
+        <h2>Touch</h2>
+        <p class="hint">Tap a rope segment to cut it. If the candy settles away from the dish, tap to try the level again. Use Pause and New game above.</p>
+      </section>
+    </aside>
+  </main>
+
+  <p id="announce" class="sr-only" aria-live="polite"></p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // Gestures on the playfield must not start a native selection or drag.
+  document.addEventListener("contextmenu", e => {
+    if (e.target.closest && e.target.closest("canvas, .board-wrap")) e.preventDefault();
+  });
+  document.addEventListener("dragstart", e => {
+    if (e.target.closest && e.target.closest("canvas, .board-wrap")) e.preventDefault();
+  });
+
+  // Keyboard play is desktop-only; phones use taps on the board.
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
+  // Phones play by gestures on the board, so there are no on-screen buttons.
+  if (phoneMode.matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches)) {
+    document.documentElement.classList.add("no-touch-pad");
+  }
+  const tip = document.getElementById("controlsTip");
+  if (tip) {
+    tip.querySelector(".tip-close").addEventListener("click", () => tip.classList.remove("is-open"));
+    if (document.documentElement.classList.contains("no-touch-pad")) tip.classList.add("is-open");
+  }
+
+  const W = 342;
+  const H = 450;
+  const GRAVITY = 1400;
+  const DAMPING = 0.995;
+  const ITERATIONS = 4;
+  const STEP = 1 / 120;
+  const CANDY_R = 14;
+  const CUT_DIST = 15;
+  const BOUNCE = 0.45;
+  const KEY = "ropedrop.best.v1";
+
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const SAND = "#ede7dc";
+  const CORAL_LT = "#f0a17f", TEAL_LT = "#75bdb2", GOLD_LT = "#f2cf7a";
+  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT };
+
+  // Three short puzzles. Each rope ends on the same candy particle; cutting a
+  // segment removes just that constraint, which is what makes the swing work.
+  const LEVELS = [
+    {
+      name: "First Cut",
+      candy: { x: 120, y: 146 },
+      ropes: [{ ax: 120, ay: 42, segs: 5 }],
+      platforms: [{ x: 78, y: 250, w: 88, h: 14 }],
+      bumpers: [],
+      dish: { x: 76, y: 220, w: 84, h: 30 },
+      stars: [{ x: 120, y: 192 }]
+    },
+    {
+      name: "Easy Swing",
+      candy: { x: 215, y: 210 },
+      ropes: [{ ax: 240, ay: 44, segs: 6 }],
+      platforms: [{ x: 60, y: 330, w: 86, h: 14 }, { x: 178, y: 360, w: 134, h: 14 }],
+      bumpers: [{ x: 110, y: 252, r: 22 }],
+      dish: { x: 182, y: 330, w: 126, h: 30 },
+      stars: [{ x: 220, y: 270 }, { x: 250, y: 310 }]
+    },
+    {
+      name: "Side Bumper",
+      candy: { x: 250, y: 160 },
+      ropes: [{ ax: 250, ay: 42, segs: 6 }],
+      platforms: [{ x: 40, y: 300, w: 96, h: 14 }, { x: 220, y: 360, w: 88, h: 14 }],
+      bumpers: [{ x: 160, y: 250, r: 26 }],
+      dish: { x: 224, y: 330, w: 80, h: 30 },
+      stars: [{ x: 250, y: 280 }]
+    }
+  ];
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const levelEl = document.getElementById("level");
+  const cutsEl = document.getElementById("cuts");
+  const bestEl = document.getElementById("best");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const announceEl = document.getElementById("announce");
+  const touchPhone = () => document.documentElement.classList.contains("no-touch-pad");
+
+  let points, constraints, platforms, bumpers, dish, stars, candy;
+  let sparks, levelIndex, score, cuts, elapsed, best;
+  let paused, overlay, overlayLock, stillTime, acc, lastTime;
+
+  // localStorage can be blocked for file:// pages; keep the best in memory then.
+  function loadBest() {
+    try {
+      const raw = window.localStorage.getItem(KEY);
+      if (!raw) return { cuts: Infinity, ms: Infinity };
+      const parsed = JSON.parse(raw);
+      if (parsed && Number.isFinite(parsed.cuts) && parsed.cuts > 0) {
+        return { cuts: Math.floor(parsed.cuts), ms: Number.isFinite(parsed.ms) ? parsed.ms : Infinity };
+      }
+    } catch (_) {}
+    return { cuts: Infinity, ms: Infinity };
+  }
+  function saveBest(v) {
+    try { window.localStorage.setItem(KEY, JSON.stringify(v)); } catch (_) {}
+  }
+
+  function announce(text) { announceEl.textContent = text; }
+
+  // The canvas has a fixed logical size; only its backing store follows the DPR.
+  // Resizing the backing store clears it; the next animation frame redraws.
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function makePoint(x, y, pinned) {
+    const p = { x, y, px: x, py: y, pinned: !!pinned };
+    points.push(p);
+    return p;
+  }
+
+  function buildLevel(index) {
+    const L = LEVELS[index];
+    points = [];
+    constraints = [];
+    sparks = [];
+    stillTime = 0;
+    overlay = null;
+    overlayLock = 0;
+    platforms = L.platforms.map(r => ({ ...r }));
+    bumpers = L.bumpers.map(c => ({ ...c }));
+    dish = { ...L.dish };
+    stars = L.stars.map(s => ({ x: s.x, y: s.y, taken: false }));
+
+    // The candy is the free end mass shared by every rope in the level.
+    candy = makePoint(L.candy.x, L.candy.y, false);
+    L.ropes.forEach((rope, ri) => {
+      const sx = rope.ax, sy = rope.ay;
+      const dx = (L.candy.x - sx) / rope.segs;
+      const dy = (L.candy.y - sy) / rope.segs;
+      const len = Math.hypot(dx, dy);
+      makePoint(sx, sy, true);
+      let prev = points[points.length - 1];
+      for (let i = 1; i < rope.segs; i++) {
+        const p = makePoint(sx + dx * i, sy + dy * i, false);
+        constraints.push({ a: prev, b: p, len, rope: ri, alive: true });
+        prev = p;
+      }
+      constraints.push({ a: prev, b: candy, len, rope: ri, alive: true });
+    });
+    updateStats();
+    announce("Level " + (index + 1) + ": " + L.name);
+  }
+
+  function reset() {
+    levelIndex = 0;
+    score = 0;
+    cuts = 0;
+    elapsed = 0;
+    paused = false;
+    acc = 0;
+    pauseBtn.textContent = "Pause";
+    pauseBtn.setAttribute("aria-pressed", "false");
+    buildLevel(levelIndex);
+    announce("New game");
+    canvas.focus({ preventScroll: true });
+  }
+
+  function updateStats() {
+    if (score > 0 && !Number.isFinite(best.cuts)) {
+      // A best is only recorded after finishing all three levels.
+    }
+    scoreEl.textContent = String(score);
+    levelEl.textContent = (levelIndex + 1) + "/" + LEVELS.length;
+    cutsEl.textContent = String(cuts);
+    bestEl.textContent = Number.isFinite(best.cuts) ? String(best.cuts) : "—";
+  }
+
+  // ---- Verlet physics ----------------------------------------------------
+
+  function solveConstraint(c) {
+    const dx = c.b.x - c.a.x;
+    const dy = c.b.y - c.a.y;
+    const d = Math.hypot(dx, dy) || 1e-6;
+    const diff = (d - c.len) / d;
+    if (c.a.pinned && c.b.pinned) return;
+    if (c.a.pinned) {
+      c.b.x -= dx * diff;
+      c.b.y -= dy * diff;
+    } else if (c.b.pinned) {
+      c.a.x += dx * diff;
+      c.a.y += dy * diff;
+    } else {
+      c.a.x += dx * diff * 0.5;
+      c.a.y += dy * diff * 0.5;
+      c.b.x -= dx * diff * 0.5;
+      c.b.y -= dy * diff * 0.5;
+    }
+  }
+
+  function bounce(p, nx, ny) {
+    const vx = p.x - p.px;
+    const vy = p.y - p.py;
+    const vn = vx * nx + vy * ny;
+    if (vn < 0) {
+      p.px = p.x - (vx - (1 + BOUNCE) * vn * nx);
+      p.py = p.y - (vy - (1 + BOUNCE) * vn * ny);
+    }
+  }
+
+  function circleCollision(p, c, pr) {
+    const dx = p.x - c.x, dy = p.y - c.y;
+    let d = Math.hypot(dx, dy);
+    const min = c.r + pr;
+    if (d >= min) return;
+    if (d < 1e-6) d = 1e-6;
+    const nx = dx / d, ny = dy / d;
+    p.x += nx * (min - d);
+    p.y += ny * (min - d);
+    bounce(p, nx, ny);
+  }
+
+  function rectCollision(p, r, pr) {
+    const cx = Math.max(r.x, Math.min(p.x, r.x + r.w));
+    const cy = Math.max(r.y, Math.min(p.y, r.y + r.h));
+    let dx = p.x - cx, dy = p.y - cy;
+    let d = Math.hypot(dx, dy);
+    let nx, ny, pen;
+    if (d > 1e-6 && d < pr) {
+      nx = dx / d; ny = dy / d; pen = pr - d;
+    } else if (d <= 1e-6) {
+      const dl = p.x - r.x, dr = r.x + r.w - p.x;
+      const dt = p.y - r.y, db = r.y + r.h - p.y;
+      const m = Math.min(dl, dr, dt, db);
+      if (m === dl) { nx = -1; ny = 0; pen = pr + dl; }
+      else if (m === dr) { nx = 1; ny = 0; pen = pr + dr; }
+      else if (m === dt) { nx = 0; ny = -1; pen = pr + dt; }
+      else { nx = 0; ny = 1; pen = pr + db; }
+    } else {
+      return;
+    }
+    p.x += nx * pen;
+    p.y += ny * pen;
+    bounce(p, nx, ny);
+  }
+
+  function keepInside(p, r) {
+    const left = 8 + r, right = W - 8 - r, top = 6 + r, bottom = H - 6 - r;
+    if (p.x < left) { p.x = left; bounce(p, 1, 0); }
+    if (p.x > right) { p.x = right; bounce(p, -1, 0); }
+    if (p.y < top) { p.y = top; bounce(p, 0, 1); }
+    if (p.y > bottom) { p.y = bottom; bounce(p, 0, -1); }
+  }
+
+  function collide(p, pr) {
+    for (const r of platforms) rectCollision(p, r, pr);
+    for (const c of bumpers) circleCollision(p, c, pr);
+    keepInside(p, pr);
+  }
+
+  function candyIsFree() {
+    return !constraints.some(c => c.alive && (c.a === candy || c.b === candy));
+  }
+
+  function step(dt) {
+    // Integrate every free particle with a fixed timestep (Verlet).
+    for (const p of points) {
+      if (p.pinned) continue;
+      const vx = (p.x - p.px) * DAMPING;
+      const vy = (p.y - p.py) * DAMPING;
+      p.px = p.x;
+      p.py = p.y;
+      p.x += vx;
+      p.y += vy + GRAVITY * dt * dt;
+    }
+    // Iteratively satisfy rope lengths, then resolve static collisions.
+    for (let i = 0; i < ITERATIONS; i++) {
+      for (const c of constraints) if (c.alive) solveConstraint(c);
+      collide(candy, CANDY_R);
+      for (const p of points) if (!p.pinned && p !== candy) keepInside(p, 2);
+    }
+
+    for (const s of stars) {
+      if (!s.taken && Math.hypot(candy.x - s.x, candy.y - s.y) < CANDY_R + 10) {
+        s.taken = true;
+        score++;
+        updateStats();
+        announce("Star collected. " + score + " total");
+      }
+    }
+
+    if (candy.x > dish.x + 5 && candy.x < dish.x + dish.w - 5 &&
+        candy.y > dish.y - 2 && candy.y < dish.y + dish.h + 8) {
+      if (levelIndex === LEVELS.length - 1) finishRun();
+      else {
+        overlay = "clear";
+        announce("Level clear. Tap to continue");
+      }
+      overlayLock = 0.35;
+      return;
+    }
+
+    if (candyIsFree()) {
+      const speed = Math.hypot(candy.x - candy.px, candy.y - candy.py);
+      stillTime = speed < 0.16 ? stillTime + dt : 0;
+      if (stillTime > 1.2) {
+        overlay = "retry";
+        overlayLock = 0.35;
+        announce("Try this level again");
+      }
+    }
+  }
+
+  function finishRun() {
+    overlay = "win";
+    const ms = Math.round(elapsed * 1000);
+    let record = false;
+    if (!Number.isFinite(best.cuts) || cuts < best.cuts || (cuts === best.cuts && ms < best.ms)) {
+      best = { cuts, ms };
+      saveBest(best);
+      record = true;
+    }
+    updateStats();
+    announce((record ? "New best. " : "") + "You win. " + score + " stars, " + cuts + " cuts");
+  }
+
+  function update(dt) {
+    if (overlayLock > 0) overlayLock = Math.max(0, overlayLock - dt);
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      sparks[i].life -= dt * 1.8;
+      if (sparks[i].life <= 0) sparks.splice(i, 1);
+    }
+    if (paused || overlay) return;
+    elapsed += dt;
+    acc += dt;
+    let guard = 0;
+    while (acc >= STEP && guard++ < 12) {
+      step(STEP);
+      acc -= STEP;
+      if (overlay) break;
+    }
+  }
+
+  // ---- Canvas art --------------------------------------------------------
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
+  function paintShape(x, y, w, h, r, color) {
+    roundRect(x, y, w, h, r);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(x, y, w, Math.max(2, h * 0.24));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  // The same inset band and ink edge on an ellipse.
+  function paintEllipse(cx, cy, rx, ry, color) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(cx - rx, cy - ry, rx * 2, Math.max(2, ry * 0.9));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  function drawRope() {
+    ctx.lineCap = "round";
+    for (const c of constraints) {
+      if (!c.alive) continue;
+      ctx.beginPath();
+      ctx.moveTo(c.a.x, c.a.y);
+      ctx.lineTo(c.b.x, c.b.y);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.strokeStyle = TEAL;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    // Anchor pegs and the small joints that make the rope read as a chain.
+    for (const p of points) {
+      if (p === candy) continue;
+      if (p.pinned) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y - 5, 7, 0, Math.PI * 2);
+        ctx.fillStyle = GOLD;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = INK;
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = TEAL_LT;
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawCandy() {
+    const r = CANDY_R;
+    ctx.save();
+    ctx.translate(candy.x, candy.y);
+    // A slight tilt from horizontal speed makes the swing legible.
+    ctx.rotate(Math.max(-0.45, Math.min(0.45, (candy.x - candy.px) * 0.09)));
+    ctx.lineJoin = "round";
+
+    // Twisted wrapper ends.
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * r * 0.65, -7);
+      ctx.lineTo(side * r * 1.75, -12);
+      ctx.lineTo(side * r * 1.45, 0);
+      ctx.lineTo(side * r * 1.75, 12);
+      ctx.lineTo(side * r * 0.65, 7);
+      ctx.closePath();
+      ctx.fillStyle = GOLD_LT;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+    }
+
+    // Round gold candy body with a cream stripe and two-tone band.
+    paintEllipse(0, 0, r * 1.05, r * 0.95, GOLD);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = CREAM;
+    ctx.fillRect(-4, -r, 8, r * 2);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawDish() {
+    const x = dish.x, y = dish.y, w = dish.w, h = dish.h;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w, y);
+    ctx.lineTo(x + w - 12, y + h);
+    ctx.lineTo(x + 12, y + h);
+    ctx.closePath();
+    ctx.fillStyle = CORAL;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = CORAL_LT;
+    ctx.fillRect(x, y, w, Math.max(2, h * 0.3));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+
+    // Cream opening makes the target read as a dish instead of a block.
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, y + 3, w / 2 - 7, 5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = CREAM;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  function drawStar(x, y, taken) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      const rr = i % 2 === 0 ? 11 : 4.8;
+      const px = x + Math.cos(a) * rr;
+      const py = y + Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = taken ? SAND : CREAM;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    if (!taken) {
+      ctx.beginPath();
+      ctx.arc(x, y, 2, 0, Math.PI * 2);
+      ctx.fillStyle = GOLD;
+      ctx.fill();
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+
+    // Flat grid keeps the paper field measurable.
+    ctx.strokeStyle = SAND;
+    ctx.lineWidth = 1.5;
+    for (let x = 42; x < W; x += 42) {
+      ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); ctx.stroke();
+    }
+    for (let y = 42; y < H; y += 42) {
+      ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke();
+    }
+
+    // Two-tone bands at the foot of the board.
+    ctx.fillStyle = TEAL_LT;
+    ctx.fillRect(0, H - 18, W, 18);
+    ctx.fillStyle = CREAM;
+    ctx.fillRect(0, H - 10, W, 10);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, H - 17); ctx.lineTo(W, H - 17); ctx.stroke();
+
+    for (const r of platforms) paintShape(r.x, r.y, r.w, r.h, 3, TEAL);
+    for (const c of bumpers) paintEllipse(c.x, c.y, c.r, c.r, TEAL);
+    drawDish();
+    for (const s of stars) drawStar(s.x, s.y, s.taken);
+    drawRope();
+    drawCandy();
+
+    for (const sp of sparks) {
+      ctx.strokeStyle = sp.gold ? GOLD : INK;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(sp.x, sp.y);
+      ctx.lineTo(sp.x + sp.vx * 6 * sp.life, sp.y + sp.vy * 6 * sp.life);
+      ctx.stroke();
+    }
+
+    if (paused || overlay) {
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(10, 10, W - 20, H - 20);
+      ctx.fillStyle = INK;
+      ctx.font = "700 26px monospace";
+      ctx.textAlign = "center";
+      let title, hint;
+      if (paused) {
+        title = "Paused";
+        hint = "Tap Pause to resume";
+      } else if (overlay === "clear") {
+        title = "Level clear";
+        hint = "Tap to continue";
+      } else if (overlay === "retry") {
+        title = "Try again";
+        hint = "Tap to retry this level";
+      } else {
+        title = "You win";
+        hint = "Tap to play again";
+      }
+      ctx.fillText(title, W / 2, H / 2 - 18);
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(W / 2 - 34, H / 2 - 8, 68, 3);
+      ctx.font = "12px monospace";
+      ctx.fillStyle = INK;
+      ctx.fillText(hint, W / 2, H / 2 + 18);
+      if (overlay === "win") {
+        ctx.font = "700 13px monospace";
+        ctx.fillText(score + " stars · " + cuts + " cuts · " + (elapsed).toFixed(1) + "s", W / 2, H / 2 + 44);
+      } else if (overlay === "clear") {
+        ctx.font = "700 13px monospace";
+        ctx.fillText(LEVELS[levelIndex].name + " · " + score + " stars", W / 2, H / 2 + 44);
+      }
+    }
+  }
+
+  function loop(now) {
+    const dt = Math.max(0, Math.min(now - lastTime, 100)) / 1000;
+    lastTime = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---- Input -------------------------------------------------------------
+
+  function pointToSegment(px, py, c) {
+    const dx = c.b.x - c.a.x, dy = c.b.y - c.a.y;
+    const len2 = dx * dx + dy * dy || 1e-6;
+    let t = ((px - c.a.x) * dx + (py - c.a.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (c.a.x + dx * t), py - (c.a.y + dy * t));
+  }
+
+  function canvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / rect.width * W,
+      y: (e.clientY - rect.top) / rect.height * H
+    };
+  }
+
+  function cutAt(pos) {
+    let hit = null, bestD = CUT_DIST;
+    for (const c of constraints) {
+      if (!c.alive) continue;
+      const d = pointToSegment(pos.x, pos.y, c);
+      if (d < bestD) { bestD = d; hit = c; }
+    }
+    if (!hit) return false;
+    hit.alive = false;
+    cuts++;
+    const mx = (hit.a.x + hit.b.x) / 2, my = (hit.a.y + hit.b.y) / 2;
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      sparks.push({ x: mx, y: my, vx: Math.cos(a), vy: Math.sin(a), life: 1, gold: i % 2 === 0 });
+    }
+    updateStats();
+    announce("Rope cut. " + cuts + " cuts");
+    return true;
+  }
+
+  canvas.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    canvas.focus({ preventScroll: true });
+    if (overlayLock > 0) return;
+    if (overlay === "clear") {
+      levelIndex++;
+      buildLevel(levelIndex);
+      return;
+    }
+    if (overlay === "retry") {
+      buildLevel(levelIndex);
+      return;
+    }
+    if (overlay === "win") {
+      reset();
+      return;
+    }
+    if (paused) {
+      togglePause();
+      return;
+    }
+    cutAt(canvasPos(e));
+  });
+  canvas.addEventListener("pointercancel", () => {});
+
+  function togglePause() {
+    if (overlay) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    pauseBtn.setAttribute("aria-pressed", String(paused));
+    announce(paused ? "Paused" : "Resumed");
+  }
+
+  pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
+  document.getElementById("newBtn").addEventListener("click", reset);
+  window.addEventListener("resize", resize);
+
+  window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
+    if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); return; }
+    if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); }
+  });
+
+  best = loadBest();
+  resize();
+  reset();
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+<script>
+(() => {
+  const btn = document.getElementById("lights");
+  if (!btn) return;
+  const KEY = "arcade.theme.v1";
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    btn.setAttribute("aria-checked", String(theme === "light"));
+    try { localStorage.setItem(KEY, theme); } catch (_) {}
+  }
+  let saved = "dark";
+  try { saved = localStorage.getItem(KEY) || "dark"; } catch (_) {}
+  setTheme(saved === "light" ? "light" : "dark");
+  btn.addEventListener("click", () => {
+    setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>

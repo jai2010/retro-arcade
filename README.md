@@ -1,6 +1,6 @@
 # Offline Arcade
 
-Twenty-two self-contained retro games. Each game is one HTML file with inline CSS and JavaScript.
+Twenty-six self-contained retro games. Each game is one HTML file with inline CSS and JavaScript.
 
 ## Play
 
@@ -34,6 +34,10 @@ No internet connection is required.
 | Road Rider | `roadrider/index.html` | Swipe lanes, tap to kick |
 | Rally Run | `rallyrun/index.html` | Drag to steer, tap to boost |
 | Highway Hero | `highwayhero/index.html` | Swipe lanes, tap to sprint |
+| Slingshot | `slingshot/index.html` | Drag and release to launch |
+| Pocket Pool | `pocketpool/index.html` | Drag back and release to shoot |
+| Hill Climb Racer | `hillclimb/index.html` | Hold right/left to drive |
+| Rope Drop | `ropedrop/index.html` | Tap a rope segment to cut |
 
 ## Notes
 
@@ -63,7 +67,7 @@ No internet connection is required.
   and best scores. `metrics.js` queues events on every device, and sends the queue
   to `/api/metrics` when the device is online and a sync server is configured.
 - Home-page tiles stay clean artwork only. Tiles can be filtered by category:
-  All, Classics, Puzzle, Action and Racing.
+  All, Classics, Puzzle, Action, Racing and Physics.
 - Share appears in the home header; Share, Like and Bookmark appear in each game
   header. Stats remain available in the admin panel.
 - For local development, run `npm install` then `npm start` and open

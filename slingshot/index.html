@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../metrics.js" defer></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slingshot</title>
+<style>
+  :root { --paper:#f7f4ee; --ink:#20262b; --muted:rgba(32,38,43,.62); --accent:#e5724c; --accent-dark:#20262b; --teal:#3f9b91; --sand:#ede7dc; --line:#ede7dc; --surface:#fffdfa; --radius:12px; --radius-sm:8px; --retro-font:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background-color:var(--paper);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.05'/%3E%3C/svg%3E");color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;overflow:hidden}
+  .shell{--board-w:min(calc((100dvh - 170px) * 0.7600),620px);--side-w:270px;--gap:clamp(12px,2vw,24px);--content-w:calc(var(--board-w) + var(--gap) + var(--side-w));height:100dvh;max-width:1080px;margin:0 auto;padding:clamp(10px,1.8vh,22px) clamp(14px,2vw,30px) clamp(10px,1.6vh,18px);display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:clamp(8px,1.4vh,16px)}
+  header.top,.game{width:min(100%,var(--content-w));margin-inline:auto}
+  header.top{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+  h1{margin:0;font-size:clamp(24px,3.4vw,38px);letter-spacing:-.02em;line-height:1.15}
+  .tagline{margin:3px 0 0;color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  button{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius-sm);box-shadow:0 2px 0 rgba(32,38,43,.18);padding:8px 14px;min-height:44px;cursor:pointer;transition:transform 120ms ease,box-shadow 120ms ease,border-color 120ms ease,background 120ms ease}
+  button:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(32,38,43,0.10);border-color:var(--teal)}
+  button:active{transform:translateY(1px);box-shadow:none}
+  button.primary{background:var(--accent);border-color:var(--ink);color:#fffdfa}
+  button.primary:hover{background:var(--accent-dark)}
+  .actions a.back{display:inline-flex;align-items:center;justify-content:center;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius-sm);box-shadow:0 2px 0 rgba(32,38,43,.18);padding:8px 14px;min-height:44px;text-decoration:none;transition:transform 120ms ease,box-shadow 120ms ease,border-color 120ms ease}
+  .actions a.back:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(32,38,43,0.10);border-color:var(--teal)}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .game{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,var(--board-w)) var(--side-w);gap:var(--gap);align-items:center}
+  .play{display:flex;flex-direction:column;gap:clamp(6px,1vh,10px);min-height:0;width:var(--board-w)}
+  .board-width{width:var(--board-w)}
+  .hud{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius)}
+  .score-block{display:flex;align-items:baseline;gap:8px}
+  .score-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+  #score{font-size:clamp(24px,3.2vh,36px);line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .chip{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--sand);border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .chip b{color:var(--ink);font-variant-numeric:tabular-nums} .chip.best b{color:var(--accent)} 
+  .board-wrap{position:relative;aspect-ratio:342/450;background:var(--sand);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 10px 24px rgba(32,38,43,0.14);padding:8px}
+  canvas.board{display:block;width:100%;height:100%;border-radius:var(--radius-sm);background:#fffdfa;touch-action:none;}
+  .side{width:100%;display:flex;flex-direction:column;gap:clamp(8px,1.3vh,14px);max-height:calc(100dvh - 120px);overflow-y:auto;padding-right:2px}
+  .panel{background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:0 6px 16px rgba(32,38,43,0.10);padding:clamp(9px,1.3vh,14px)}
+  .panel h2{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .legend{font-size:12px} .legend div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+  kbd{font:inherit;font-size:11px;background:var(--sand);border:2px solid var(--ink);border-bottom-width:2px;border-radius:5px;padding:1px 5px;white-space:nowrap}
+  .help,.hint,.record{margin:0;color:var(--muted);font-size:12px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media(max-width:760px){body{overflow:auto}.shell{height:auto;min-height:100dvh}header.top,.game{width:100%}header.top{align-items:flex-start;flex-direction:column}.game{grid-template-columns:1fr;align-items:start}.play{width:100%}.board-width{width:min(100%,calc((100dvh - 220px) * 0.7600)) !important;margin-inline:auto}.play .hud{width:100%}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none;overflow:visible}.side .panel:last-child{grid-column:1/-1}}
+  @media(max-height:620px) and (min-width:761px){.tagline{display:none}h1{font-size:24px}.side{gap:6px}.panel{padding:8px}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0.01ms!important}}
+  /* Shared arcade header and retro typography */
+  body{font-family:var(--retro-font);font-size:13px}
+  header,header.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-direction:row!important;align-items:center!important;min-height:52px;padding-bottom:10px;border-bottom:2px solid var(--ink)}
+  header h1{font-family:var(--retro-font);font-size:24px;line-height:1;text-transform:uppercase;letter-spacing:.08em;margin:0}
+  header .tagline{margin:4px 0 0;font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44ch;text-transform:uppercase;letter-spacing:.05em}
+  header .actions{flex-wrap:nowrap}
+  .panel h2,.chip,.score-label,kbd,.keys,.name,.title,.desc{font-family:var(--retro-font);letter-spacing:.05em}
+  .panel h2,.chip,.score-label,.keys{text-transform:uppercase}
+  button,.actions a.back{font-family:var(--retro-font);text-transform:uppercase;letter-spacing:.05em;font-size:12px}
+  /* Arcade lighting: shared with the home page */
+  body[data-theme="dark"]{--paper:#171b1e;--ink:#f7f4ee;--muted:#aab2b7;--line:rgba(247,244,238,.22);--surface:#20262b;--sand:#2b3237}
+  body{background-color:var(--paper);background-image:radial-gradient(circle at 50% -10%,rgba(229,114,76,.10),transparent 60%),radial-gradient(rgba(128,128,128,.055) .7px,transparent .7px);background-size:auto,6px 6px;transition:background-color 200ms ease,color 200ms ease}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;background:repeating-linear-gradient(180deg,rgba(128,128,128,.035) 0 1px,transparent 1px 4px)}
+  .shell{position:relative;z-index:1}
+  .joystick{width:44px;height:44px;min-height:44px;padding:0;border-radius:50%;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;cursor:pointer;text-transform:none}
+  .joystick .stick{display:block;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid rgba(32,38,43,.65);transform:translateY(-5px);transition:transform 180ms ease}
+  .joystick[aria-checked="true"] .stick{transform:translateY(5px)} .joystick:hover{border-color:var(--accent)}
+  /* Phone-first play: no keyboard prompts and no button panels. */
+  @media(max-width:760px){header .tagline{display:none!important}header h1{font-size:18px!important}.actions{flex-wrap:nowrap!important;justify-content:flex-end!important;gap:4px!important}.actions button,.actions a.back{min-height:36px!important;padding:5px 7px!important;font-size:10px!important}.joystick{width:40px!important;height:40px!important;min-height:40px!important}.hud{padding:6px 10px!important;gap:6px!important}.chip{font-size:10px!important;padding:3px 7px!important}.legend,.help,.hint{display:none!important}.shell{padding-bottom:24px!important}}
+  /* Phone layout: fit the board to the viewport; draw the rest from the canvas. */
+  .gesture-tip{display:none}
+  html.no-touch-pad .shell{max-width:none!important;padding:8px 4px 14px!important}
+  html.no-touch-pad header,html.no-touch-pad .game{width:100%!important;max-width:none!important}
+  html.no-touch-pad .game{grid-template-columns:1fr!important;grid-template-rows:1fr!important;align-items:stretch!important}
+  html.no-touch-pad .play{width:100%!important;height:100%;justify-content:flex-start}
+  html.no-touch-pad .play .hud{width:100%!important}
+  html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 170px) * 0.7600))!important;margin-inline:auto!important}
+  html.no-touch-pad .side{display:none!important}
+  html.no-touch-pad .gesture-tip{display:none;position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;align-items:center;gap:12px;width:min(92vw,420px);max-width:min(92vw,420px);padding:9px 10px 9px 14px;border:1px solid rgba(128,128,128,.35);border-radius:14px;background:var(--surface,#fffdfa);box-shadow:0 8px 24px rgba(0,0,0,.25);color:var(--muted,currentColor);font:12px/1.35 var(--retro-font,monospace);text-align:center}
+  html.no-touch-pad .gesture-tip.is-open{display:flex}
+  .tip-close{flex:0 0 auto;width:30px;height:30px;padding:0;border:1px solid rgba(128,128,128,.35);border-radius:50%;background:transparent;color:inherit;font:18px/1 monospace;cursor:pointer}
+  @media(max-height:520px) and (pointer:coarse){html.no-touch-pad .board-wrap,html.no-touch-pad .board-width{width:min(100%,calc((100dvh - 140px) * 0.7600))!important}}
+
+  /* Phones: use the available viewport height for the playfield. */
+  html.no-touch-pad .board-wrap {
+    width: 100% !important;
+    height: calc(100dvh - 150px) !important;
+    aspect-ratio: auto !important;
+  }
+
+  /* Gesture play: no text selection, callout or highlight while dragging. */
+  html, body, .shell, .play, .board-wrap, canvas, .gesture-tip {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .board-wrap, canvas { touch-action: none; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div>
+      <h1>Slingshot</h1>
+      <p class="tagline">Pull back. Let fly. Topple the stack.</p>
+    </div>
+    <div class="actions">
+      <button id="lights" class="joystick" type="button" role="switch" aria-checked="false" aria-label="Toggle arcade lights"><span class="stick" aria-hidden="true"></span></button>
+      <a class="back" href="../index.html" aria-label="Back to arcade">← Arcade</a>
+      <button id="pauseBtn" type="button" aria-pressed="false">Pause</button>
+      <button id="newBtn" class="primary" type="button">New game</button>
+    </div>
+  </header>
+
+  <main class="game">
+    <section class="play" aria-label="Game">
+      <div class="hud board-width" aria-live="polite">
+        <div class="score-block"><span class="score-label">Score</span><strong id="score">0</strong></div>
+        <div class="chips">
+          <span class="chip">Birds <b id="birds">3</b></span>
+          <span class="chip best">Best <b id="best">0</b></span>
+        </div>
+      </div>
+
+      <div class="board-wrap board-width">
+        <canvas id="game" class="board" tabindex="0" role="img" aria-label="Slingshot playfield: drag the bird back and release to topple the blocks">Your browser does not support canvas.</canvas>
+      </div>
+      <div class="gesture-tip" id="controlsTip" role="status" aria-label="Controls">
+        <span>Drag the bird back and release to launch</span>
+        <button type="button" class="tip-close" aria-label="Close controls tip">×</button>
+      </div>
+    </section>
+
+    <aside class="side" aria-label="Instructions">
+      <section class="panel">
+        <h2>Rules</h2>
+        <p class="help">Pull the bird back and let go. Topple every block on the platform with three birds. Your score counts the blocks you knock down, plus a bonus for birds you have left.</p>
+      </section>
+      <section class="panel">
+        <h2>Touch</h2>
+        <p class="hint">Drag left and down to aim up and right, then release. The blocks have weight, spin and friction — hit them low to send the stack flying.</p>
+      </section>
+    </aside>
+  </main>
+
+  <p id="announce" class="sr-only" aria-live="polite"></p>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // Gestures on the playfield must not start a native selection or drag.
+  document.addEventListener("contextmenu", e => {
+    if (e.target.closest && e.target.closest("canvas, .board-wrap")) e.preventDefault();
+  });
+  document.addEventListener("dragstart", e => {
+    if (e.target.closest && e.target.closest("canvas, .board-wrap")) e.preventDefault();
+  });
+
+  const phoneMode = window.matchMedia("(max-width: 760px)");
+
+  // Phones play by gestures on the board, so there are no on-screen buttons.
+  if (phoneMode.matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 0 && window.matchMedia("(pointer: coarse)").matches)) {
+    document.documentElement.classList.add("no-touch-pad");
+  }
+  const tip = document.getElementById("controlsTip");
+  if (tip) {
+    tip.querySelector(".tip-close").addEventListener("click", () => tip.classList.remove("is-open"));
+    if (document.documentElement.classList.contains("no-touch-pad")) tip.classList.add("is-open");
+  }
+
+  const W = 342;
+  const H = 450;
+  const GROUND = H - 42;
+  const REST = { x: 76, y: 318 };
+  const BIRD_R = 15;
+  const MAX_PULL = 66;
+  const LAUNCH = 8.0;
+  const GRAVITY = 980;
+  const STEP = 1 / 120;
+  const MAX_STEPS = 5;
+  const KEY = "slingshot.best.v1";
+  // Illustration palette, shared with the arcade thumbnails.
+  const PAPER = "#f7f4ee", INK = "#20262b", CORAL = "#e5724c";
+  const TEAL = "#3f9b91", GOLD = "#e6b34d", CREAM = "#fffdfa";
+  const CORAL_LT = "#f0a17f", TEAL_LT = "#75bdb2", GOLD_LT = "#f2cf7a";
+  const GRID = "#ede7dc";
+  const TINTS = { [CORAL]: CORAL_LT, [TEAL]: TEAL_LT, [GOLD]: GOLD_LT };
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const birdsEl = document.getElementById("birds");
+  const bestEl = document.getElementById("best");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const announceEl = document.getElementById("announce");
+  const touchPhone = () => document.documentElement.classList.contains("no-touch-pad");
+
+  let bird, blocks, statics, pops;
+  let dragging, dragPt, pointerId;
+  let birdsLeft, knocked, score, best, bestAnnounced;
+  let started, paused, gameOver, won, shotTime;
+  let acc, lastTime;
+
+  // localStorage can be blocked for file:// pages; keep the best in memory then.
+  function loadBest() {
+    try {
+      const v = Number(window.localStorage.getItem(KEY));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch (_) { return 0; }
+  }
+  function saveBest(v) {
+    try { window.localStorage.setItem(KEY, String(v)); } catch (_) {}
+  }
+
+  // The canvas has a fixed logical size; only its backing store follows the DPR.
+  // Resizing the backing store clears it; the next animation frame redraws.
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function announce(text) { announceEl.textContent = text; }
+
+  function makeBird() {
+    const I = 0.5 * 1.6 * BIRD_R * BIRD_R;
+    return {
+      shape: "circle", x: REST.x, y: REST.y, vx: 0, vy: 0, a: 0, w: 0,
+      r: BIRD_R, mass: 1.6, invMass: 1 / 1.6, invI: 1 / I,
+      rest: 0.42, friction: 0.55, sleeping: false, still: 0, active: false
+    };
+  }
+
+  function makeBlock(x, y, color) {
+    const hw = 17, hh = 13, mass = 1;
+    const I = (1 / 12) * mass * ((hw * 2) ** 2 + (hh * 2) ** 2);
+    return {
+      shape: "box", x, y, vx: 0, vy: 0, a: 0, w: 0, hw, hh,
+      mass, invMass: 1 / mass, invI: 1 / I,
+      rest: 0.16, friction: 0.65, sleeping: false, still: 0,
+      knocked: false, startX: x, startY: y, color
+    };
+  }
+
+  function buildStatics() {
+    statics = [
+      // A very wide box serves as the ground plane.
+      { shape: "box", x: W / 2, y: GROUND + 1000, hw: 10000, hh: 1000, a: 0,
+        invMass: 0, invI: 0, rest: 0.18, friction: 0.7, sleeping: false },
+      // The raised platform on the right.
+      { shape: "box", x: 272, y: 357, hw: 66, hh: 7, a: 0,
+        invMass: 0, invI: 0, rest: 0.18, friction: 0.7, sleeping: false }
+    ];
+  }
+
+  function reset() {
+    buildStatics();
+    bird = makeBird();
+    blocks = [
+      makeBlock(238, 337, CORAL),
+      makeBlock(272, 337, TEAL),
+      makeBlock(306, 337, GOLD),
+      makeBlock(272, 311, CORAL)
+    ];
+    pops = [];
+    dragging = false;
+    dragPt = { x: REST.x, y: REST.y };
+    pointerId = null;
+    birdsLeft = 3;
+    knocked = 0;
+    score = 0;
+    bestAnnounced = false;
+    started = false;
+    paused = false;
+    gameOver = false;
+    won = false;
+    shotTime = 0;
+    acc = 0;
+    pauseBtn.textContent = "Pause";
+    pauseBtn.setAttribute("aria-pressed", "false");
+    updateStats();
+    announce("New game");
+    canvas.focus({ preventScroll: true });
+  }
+
+  function updateStats() {
+    score = knocked + (gameOver && won ? birdsLeft : 0);
+    if (score > best) {
+      best = score;
+      saveBest(best);
+      if (!bestAnnounced) { bestAnnounced = true; announce("New best score"); }
+    }
+    scoreEl.textContent = String(score);
+    birdsEl.textContent = String(birdsLeft);
+    bestEl.textContent = String(best);
+  }
+
+  function togglePause() {
+    if (gameOver || !started) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    pauseBtn.setAttribute("aria-pressed", String(paused));
+    announce(paused ? "Paused" : "Resumed");
+  }
+
+  // ---- Small custom rigid-body engine -------------------------------------
+
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  function toLocal(b, px, py) {
+    const c = Math.cos(b.a), s = Math.sin(b.a);
+    const dx = px - b.x, dy = py - b.y;
+    return { x: dx * c + dy * s, y: -dx * s + dy * c };
+  }
+  function worldDir(b, lx, ly) {
+    const c = Math.cos(b.a), s = Math.sin(b.a);
+    return { x: lx * c - ly * s, y: lx * s + ly * c };
+  }
+  function worldPoint(b, lx, ly) {
+    const c = Math.cos(b.a), s = Math.sin(b.a);
+    return { x: b.x + lx * c - ly * s, y: b.y + lx * s + ly * c };
+  }
+
+  // Contact of a point (a block corner) against an oriented box. The returned
+  // normal points out of the box, toward the point.
+  function pointBoxContact(px, py, box, pad) {
+    const L = toLocal(box, px, py);
+    const faceX = box.hw - Math.abs(L.x);
+    const faceY = box.hh - Math.abs(L.y);
+    if (faceX < -pad || faceY < -pad) return null;
+    let nlx, nly, depth;
+    if (faceX < faceY) {
+      nlx = L.x >= 0 ? 1 : -1; nly = 0; depth = faceX;
+    } else {
+      nlx = 0; nly = L.y >= 0 ? 1 : -1; depth = faceY;
+    }
+    const qx = clamp(L.x, -box.hw, box.hw);
+    const qy = clamp(L.y, -box.hh, box.hh);
+    const n = worldDir(box, nlx, nly);
+    const p = worldPoint(box, qx, qy);
+    return { nx: n.x, ny: n.y, depth, px: p.x, py: p.y };
+  }
+
+  // Contact of a circle against an oriented box; normal points out of the box.
+  function circleBoxContact(circle, box, pad) {
+    const L = toLocal(box, circle.x, circle.y);
+    const qx = clamp(L.x, -box.hw, box.hw);
+    const qy = clamp(L.y, -box.hh, box.hh);
+    const dx = L.x - qx, dy = L.y - qy;
+    const d2 = dx * dx + dy * dy;
+    const reach = circle.r + pad;
+    if (d2 > reach * reach) return null;
+    let nlx, nly, depth, clx, cly;
+    if (d2 > 1e-8) {
+      const d = Math.sqrt(d2);
+      nlx = dx / d; nly = dy / d; depth = circle.r - d;
+      clx = qx; cly = qy;
+    } else {
+      const faceX = box.hw - Math.abs(L.x);
+      const faceY = box.hh - Math.abs(L.y);
+      if (faceX < faceY) {
+        nlx = L.x >= 0 ? 1 : -1; nly = 0;
+        depth = circle.r + faceX; clx = nlx * box.hw; cly = L.y;
+      } else {
+        nlx = 0; nly = L.y >= 0 ? 1 : -1;
+        depth = circle.r + faceY; clx = L.x; cly = nly * box.hh;
+      }
+    }
+    const n = worldDir(box, nlx, nly);
+    const p = worldPoint(box, clx, cly);
+    return { nx: n.x, ny: n.y, depth, px: p.x, py: p.y };
+  }
+
+  function corners(b) {
+    const c = Math.cos(b.a), s = Math.sin(b.a);
+    return [
+      worldPoint(b, -b.hw, -b.hh), worldPoint(b, b.hw, -b.hh),
+      worldPoint(b, b.hw, b.hh), worldPoint(b, -b.hw, b.hh)
+    ];
+  }
+
+  const PAD = 1.5;
+  function flip(c) { return { nx: -c.nx, ny: -c.ny, depth: c.depth, px: c.px, py: c.py }; }
+
+  function addContacts(list, a, b) {
+    // Normal convention: from body a toward body b.
+    if (a.shape === "circle" && b.shape === "box") {
+      const c = circleBoxContact(a, b, PAD);
+      if (c) list.push({ a, b, ...flip(c) });
+    } else if (a.shape === "box" && b.shape === "circle") {
+      const c = circleBoxContact(b, a, PAD);
+      if (c) list.push({ a, b, ...c });
+    } else if (a.shape === "box" && b.shape === "box") {
+      for (const p of corners(a)) {
+        const c = pointBoxContact(p.x, p.y, b, PAD);
+        if (c) list.push({ a, b, ...flip(c) });
+      }
+      for (const p of corners(b)) {
+        const c = pointBoxContact(p.x, p.y, a, PAD);
+        if (c) list.push({ a, b, ...c });
+      }
+    }
+  }
+
+  function gatherContacts(list) {
+    const dyn = blocks.slice();
+    if (bird && bird.active) dyn.push(bird);
+    for (const d of dyn) {
+      for (const s of statics) {
+        if (d.shape === "circle") {
+          const c = circleBoxContact(d, s, PAD);
+          if (c) list.push({ a: d, b: s, ...flip(c) });
+        } else {
+          for (const p of corners(d)) {
+            const c = pointBoxContact(p.x, p.y, s, PAD);
+            if (c) list.push({ a: d, b: s, ...flip(c) });
+          }
+        }
+      }
+    }
+    for (let i = 0; i < dyn.length; i++) {
+      for (let j = i + 1; j < dyn.length; j++) addContacts(list, dyn[i], dyn[j]);
+    }
+  }
+
+  function pointVel(b, rx, ry) {
+    return { x: b.vx - b.w * ry, y: b.vy + b.w * rx };
+  }
+
+  function applyImpulse(a, b, ix, iy, j, rax, ray, rbx, rby) {
+    if (!j) return;
+    const px = ix * j, py = iy * j;
+    a.vx -= px * a.invMass; a.vy -= py * a.invMass;
+    a.w -= (rax * py - ray * px) * a.invI;
+    b.vx += px * b.invMass; b.vy += py * b.invMass;
+    b.w += (rbx * py - rby * px) * b.invI;
+  }
+
+  function solveContact(a, b, c) {
+    const nx = c.nx, ny = c.ny;
+    const rax = c.px - a.x, ray = c.py - a.y;
+    const rbx = c.px - b.x, rby = c.py - b.y;
+    const va = pointVel(a, rax, ray);
+    const vb = pointVel(b, rbx, rby);
+    const rvx = vb.x - va.x, rvy = vb.y - va.y;
+    const vn = rvx * nx + rvy * ny;
+
+    // Wake a resting body when something lively touches it.
+    if (a.sleeping && (Math.abs(b.vx) + Math.abs(b.vy) > 24 || Math.abs(b.w) > 0.8)) {
+      a.sleeping = false; a.still = 0;
+    }
+    if (b.sleeping && (Math.abs(a.vx) + Math.abs(a.vy) > 24 || Math.abs(a.w) > 0.8)) {
+      b.sleeping = false; b.still = 0;
+    }
+    if (a.sleeping && b.sleeping) return;
+
+    const rnA = rax * ny - ray * nx;
+    const rnB = rbx * ny - rby * nx;
+    const denom = a.invMass + b.invMass + rnA * rnA * a.invI + rnB * rnB * b.invI;
+    if (denom <= 0) return;
+
+    const e = Math.min(a.rest, b.rest);
+    const j = vn < 0 ? -(1 + e) * vn / denom : 0;
+    applyImpulse(a, b, nx, ny, j, rax, ray, rbx, rby);
+
+    // Friction impulse, limited by the Coulomb cone.
+    const va2 = pointVel(a, rax, ray);
+    const vb2 = pointVel(b, rbx, rby);
+    const rv2x = vb2.x - va2.x, rv2y = vb2.y - va2.y;
+    const dot = rv2x * nx + rv2y * ny;
+    let tx = rv2x - nx * dot, ty = rv2y - ny * dot;
+    const tl = Math.hypot(tx, ty);
+    if (tl > 1e-5) {
+      tx /= tl; ty /= tl;
+      const rtA = rax * ty - ray * tx;
+      const rtB = rbx * ty - rby * tx;
+      const fden = a.invMass + b.invMass + rtA * rtA * a.invI + rtB * rtB * b.invI;
+      if (fden > 0) {
+        let jt = -(rv2x * tx + rv2y * ty) / fden;
+        const maxF = Math.abs(j) * Math.sqrt(a.friction * b.friction);
+        jt = clamp(jt, -maxF, maxF);
+        applyImpulse(a, b, tx, ty, jt, rax, ray, rbx, rby);
+      }
+    }
+
+    // Positional correction keeps the stack from sinking.
+    if (c.depth > 0.4) {
+      const mag = Math.max(c.depth - 0.25, 0) / (a.invMass + b.invMass) * 0.4;
+      a.x -= nx * mag * a.invMass; a.y -= ny * mag * a.invMass;
+      b.x += nx * mag * b.invMass; b.y += ny * mag * b.invMass;
+    }
+  }
+
+  function markKnocked() {
+    for (const b of blocks) {
+      if (b.knocked) continue;
+      const moved = Math.hypot(b.x - b.startX, b.y - b.startY);
+      if (moved > 24 || Math.abs(b.a) > 0.55 || b.y > GROUND - 4) {
+        b.knocked = true;
+        knocked++;
+        pops.push({ x: b.x, y: b.y - 12, life: 1 });
+        updateStats();
+        announce("Block down. " + knocked + " of " + blocks.length);
+      }
+    }
+  }
+
+  function step(dt) {
+    const dyn = blocks.slice();
+    if (bird && bird.active) dyn.push(bird);
+
+    for (const d of dyn) {
+      if (d.sleeping) continue;
+      d.vy += GRAVITY * dt;
+      d.vx *= 0.9996;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.a += d.w * dt;
+    }
+
+    const contacts = [];
+    for (let iter = 0; iter < 6; iter++) {
+      contacts.length = 0;
+      gatherContacts(contacts);
+      for (const c of contacts) solveContact(c.a, c.b, c);
+    }
+
+    for (const d of dyn) {
+      if (d.sleeping) continue;
+      const speed2 = d.vx * d.vx + d.vy * d.vy;
+      if (speed2 < 12 && Math.abs(d.w) < 0.12) d.still += dt;
+      else d.still = 0;
+      if (d.still > 0.7) { d.sleeping = true; d.vx = d.vy = d.w = 0; }
+    }
+
+    markKnocked();
+  }
+
+  function settleShot() {
+    bird.active = false;
+    if (knocked === blocks.length) {
+      won = true;
+      gameOver = true;
+      updateStats();
+      announce("You win! Score " + score);
+    } else if (birdsLeft <= 0) {
+      gameOver = true;
+      updateStats();
+      announce("Out of birds. Score " + score);
+    } else {
+      bird = makeBird();
+      announce("Bird ready");
+    }
+  }
+
+  function launch() {
+    const vx = (REST.x - bird.x) * LAUNCH;
+    const vy = (REST.y - bird.y) * LAUNCH;
+    const speed = Math.hypot(vx, vy);
+    const cap = 540;
+    const scale = speed > cap ? cap / speed : 1;
+    bird.vx = vx * scale;
+    bird.vy = vy * scale;
+    bird.sleeping = false;
+    bird.still = 0;
+    bird.active = true;
+    birdsLeft--;
+    started = true;
+    shotTime = 0;
+    updateStats();
+    announce("Bird launched");
+  }
+
+  function update(dt) {
+    if (paused || gameOver) return;
+    for (let i = pops.length - 1; i >= 0; i--) {
+      pops[i].life -= dt / 700;
+      pops[i].y -= dt * 26;
+      if (pops[i].life <= 0) pops.splice(i, 1);
+    }
+    if (!started) return;
+
+    acc += dt;
+    let n = 0;
+    while (acc >= STEP && n < MAX_STEPS) {
+      step(STEP);
+      acc -= STEP;
+      n++;
+    }
+    if (acc > STEP * MAX_STEPS) acc = 0;
+
+    if (bird && bird.active) {
+      shotTime += dt;
+      if (bird.x > W + 80 || bird.y > GROUND + 80 ||
+          (bird.sleeping && shotTime > 0.6) || shotTime > 4.5) {
+        settleShot();
+      }
+    }
+  }
+
+  // ---- Drawing ------------------------------------------------------------
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // Flat palette fill, thick ink outline and a two-tone top band — the same
+  // construction used by the arcade thumbnail illustrations.
+  function paintShape(x, y, w, h, r, color) {
+    roundRect(x, y, w, h, r);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(x, y, w, Math.max(2, h * 0.24));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  function paintEllipse(cx, cy, rx, ry, color) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TINTS[color] || CREAM;
+    ctx.fillRect(cx - rx, cy - ry, rx * 2, Math.max(2, ry * 0.9));
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  function drawCloud(x, y, s) {
+    ctx.fillStyle = TEAL_LT;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 25 * s, 9 * s, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - 13 * s, y + 2 * s, 14 * s, 6 * s, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 14 * s, y + 2 * s, 15 * s, 6 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawBlock(b) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.a);
+    paintShape(-b.hw, -b.hh, b.hw * 2, b.hh * 2, 3, b.color);
+    ctx.fillStyle = CREAM;
+    ctx.fillRect(-b.hw + 4, 1, b.hw * 2 - 8, 3);
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.arc(-b.hw + 6, b.hh - 5, 1.6, 0, Math.PI * 2);
+    ctx.arc(b.hw - 6, b.hh - 5, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPlatform() {
+    paintShape(216, 364, 12, 44, 3, TEAL);
+    paintShape(322, 364, 12, 44, 3, TEAL);
+    paintShape(206, 350, 132, 14, 3, TEAL);
+    ctx.fillStyle = CREAM;
+    ctx.fillRect(212, 356, 120, 3);
+  }
+
+  function drawSlingshot(back) {
+    const leftTip = { x: 58, y: 292 };
+    const rightTip = { x: 96, y: 290 };
+    if (back) {
+      // Wooden trunk and two forked arms, drawn as two-tone outlined strokes.
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      const arms = [
+        [[REST.x, 340], [leftTip.x, leftTip.y]],
+        [[REST.x, 340], [rightTip.x, rightTip.y]],
+        [[REST.x, REST.y + 22], [REST.x, GROUND - 4]]
+      ];
+      for (const [p, q] of arms) {
+        ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]);
+        ctx.strokeStyle = INK; ctx.lineWidth = 13; ctx.stroke();
+        ctx.strokeStyle = TEAL; ctx.lineWidth = 8; ctx.stroke();
+      }
+      paintShape(REST.x - 18, GROUND - 10, 36, 12, 3, TEAL);
+      ctx.fillStyle = TEAL_LT;
+      ctx.beginPath(); ctx.arc(leftTip.x, leftTip.y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(rightTip.x, rightTip.y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(leftTip.x, leftTip.y, 6, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(rightTip.x, rightTip.y, 6, 0, Math.PI * 2); ctx.stroke();
+      return;
+    }
+    // Rubber bands: ink edge with a coral core.
+    if (!bird) return;
+    for (const tip of [leftTip, rightTip]) {
+      ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(bird.x, bird.y);
+      ctx.lineCap = "round"; ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.stroke();
+      ctx.strokeStyle = CORAL; ctx.lineWidth = 3; ctx.stroke();
+    }
+  }
+
+  // The bird is the same character as its thumbnail: coral body, cream belly,
+  // pointed feathered wing, white eye and gold beak, all with heavy ink edges.
+  function drawBird() {
+    if (!bird) return;
+    const r = BIRD_R;
+    ctx.save();
+    ctx.translate(bird.x, bird.y);
+    ctx.rotate(bird.a);
+    ctx.lineJoin = "round";
+
+    // Three pointed tail feathers.
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.7, 1);
+    ctx.lineTo(-r * 1.9, -r * 0.5);
+    ctx.lineTo(-r * 1.5, r * 0.05);
+    ctx.lineTo(-r * 1.95, r * 0.75);
+    ctx.closePath();
+    ctx.fillStyle = CORAL;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+
+    paintEllipse(0, 0, r * 1.05, r * 0.92, CORAL);
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.18, r * 0.35, r * 0.6, r * 0.34, -0.2, 0, Math.PI * 2);
+    ctx.fillStyle = CREAM;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.rotate(0.16);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.15, -r * 0.05);
+    ctx.lineTo(-r * 1.15, -r * 1.35);
+    ctx.lineTo(-r * 0.62, -r * 0.38);
+    ctx.lineTo(-r * 1.35, -r * 0.72);
+    ctx.lineTo(-r * 0.32, r * 0.12);
+    ctx.closePath();
+    ctx.fillStyle = CORAL_LT;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.strokeStyle = CREAM;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.45, -r * 0.25);
+    ctx.lineTo(-r * 1.0, -r * 1.1);
+    ctx.moveTo(-r * 0.35, -r * 0.02);
+    ctx.lineTo(-r * 1.1, -r * 0.55);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(r * 0.42, -r * 0.38, r * 0.33, 0, Math.PI * 2);
+    ctx.fillStyle = CREAM;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(r * 0.52, -r * 0.38, r * 0.14, 0, Math.PI * 2);
+    ctx.fillStyle = INK;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(r * 0.47, -r * 0.45, r * 0.05, 0, Math.PI * 2);
+    ctx.fillStyle = CREAM;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(r * 0.85, -r * 0.18);
+    ctx.lineTo(r * 1.5, r * 0.02);
+    ctx.lineTo(r * 0.85, r * 0.25);
+    ctx.closePath();
+    ctx.fillStyle = GOLD;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawAim() {
+    if (!dragging) return;
+    const vx = (REST.x - bird.x) * LAUNCH;
+    const vy = (REST.y - bird.y) * LAUNCH;
+    const speed = Math.hypot(vx, vy);
+    const cap = 540;
+    const scale = speed > cap ? cap / speed : 1;
+    ctx.fillStyle = TEAL;
+    for (let i = 1; i <= 14; i++) {
+      const t = i * 0.045;
+      const x = bird.x + vx * scale * t;
+      const y = bird.y + vy * scale * t + 0.5 * GRAVITY * t * t;
+      if (y > GROUND || x > W) break;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, W, H);
+
+    // Ink grid lines keep the paper field measurable.
+    ctx.strokeStyle = GRID;
+    ctx.lineWidth = 1.5;
+    for (let x = 42; x < W; x += 42) {
+      ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, GROUND); ctx.stroke();
+    }
+    for (let y = 42; y < GROUND; y += 42) {
+      ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(274, 70, 24, 0, Math.PI * 2);
+    ctx.fillStyle = CORAL_LT;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(274, 70, 15, 0, Math.PI * 2);
+    ctx.fillStyle = CORAL;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    drawCloud(78, 104, 0.9);
+    drawCloud(226, 146, 0.62);
+    drawCloud(150, 58, 0.5);
+
+    // Two bands of low hills give the field some depth.
+    ctx.fillStyle = TEAL_LT;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND);
+    for (let x = 0; x <= W; x += 34) ctx.lineTo(x, GROUND - 24 - Math.sin(x / 52) * 16);
+    ctx.lineTo(W, GROUND);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = CREAM;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND);
+    for (let x = 0; x <= W; x += 28) ctx.lineTo(x, GROUND - 10 - Math.sin(x / 38) * 8);
+    ctx.lineTo(W, GROUND);
+    ctx.closePath();
+    ctx.fill();
+
+    drawSlingshot(true);
+    drawPlatform();
+    for (const b of blocks) drawBlock(b);
+    drawAim();
+    drawSlingshot(false);
+    drawBird();
+
+    // Ground stripe, drawn last so it covers the feet of the scenery.
+    ctx.fillStyle = CREAM;
+    ctx.fillRect(0, GROUND, W, H - GROUND);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, GROUND + 1); ctx.lineTo(W, GROUND + 1); ctx.stroke();
+    ctx.strokeStyle = GRID;
+    ctx.lineWidth = 1.5;
+    for (let x = 8; x < W; x += 22) {
+      ctx.beginPath(); ctx.moveTo(x, GROUND + 8); ctx.lineTo(x + 9, GROUND + 8); ctx.stroke();
+    }
+
+    for (const p of pops) {
+      ctx.fillStyle = CORAL;
+      ctx.font = "800 18px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("+1", p.x, p.y);
+    }
+
+    if (paused || gameOver || !started) {
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(10, 10, W - 20, H - 20);
+      ctx.fillStyle = INK;
+      ctx.font = "700 26px monospace";
+      ctx.textAlign = "center";
+      const title = gameOver ? (won ? "You win!" : "Out of birds")
+        : paused ? "Paused" : "Slingshot";
+      ctx.fillText(title, W / 2, H / 2 - 18);
+      ctx.fillStyle = CORAL;
+      ctx.fillRect(W / 2 - 34, H / 2 - 8, 68, 3);
+      ctx.font = "12px monospace";
+      ctx.fillStyle = INK;
+      const hint = gameOver
+        ? "Tap New game to play again"
+        : paused
+          ? "Tap Pause to resume"
+          : "Drag the bird back and release to launch";
+      ctx.fillText(hint, W / 2, H / 2 + 18);
+      if (gameOver || started) {
+        ctx.fillStyle = INK;
+        ctx.font = "700 14px monospace";
+        ctx.fillText("Score " + score, W / 2, H / 2 + 42);
+      }
+    }
+  }
+
+  function loop(now) {
+    const dt = Math.max(0, Math.min(now - lastTime, 100)) / 1000;
+    lastTime = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---- Input --------------------------------------------------------------
+
+  function pointerPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * W / r.width,
+      y: (e.clientY - r.top) * H / r.height
+    };
+  }
+
+  function clampDrag(p) {
+    let dx = p.x - REST.x, dy = p.y - REST.y;
+    const d = Math.hypot(dx, dy);
+    if (d > MAX_PULL) { dx = dx / d * MAX_PULL; dy = dy / d * MAX_PULL; }
+    return {
+      x: clamp(REST.x + dx, REST.x - 60, REST.x + 8),
+      y: clamp(REST.y + dy, 150, GROUND - BIRD_R - 6)
+    };
+  }
+
+  canvas.addEventListener("pointerdown", e => {
+    if (paused || gameOver || !bird || bird.active || dragging) return;
+    const p = pointerPos(e);
+    if (Math.hypot(p.x - bird.x, p.y - bird.y) > 32) return;
+    e.preventDefault();
+    dragging = true;
+    pointerId = e.pointerId;
+    dragPt = clampDrag(p);
+    bird.x = dragPt.x; bird.y = dragPt.y;
+    bird.a = clamp((REST.y - bird.y) * 0.004, -0.5, 0.3);
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    canvas.focus({ preventScroll: true });
+  });
+
+  canvas.addEventListener("pointermove", e => {
+    if (!dragging || e.pointerId !== pointerId) return;
+    e.preventDefault();
+    dragPt = clampDrag(pointerPos(e));
+    bird.x = dragPt.x; bird.y = dragPt.y;
+    bird.a = clamp((REST.y - bird.y) * 0.004, -0.5, 0.3);
+  });
+
+  canvas.addEventListener("pointerup", e => {
+    if (!dragging || e.pointerId !== pointerId) return;
+    e.preventDefault();
+    dragging = false;
+    pointerId = null;
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    launch();
+  });
+
+  canvas.addEventListener("pointercancel", () => {
+    if (!dragging) return;
+    dragging = false;
+    pointerId = null;
+    bird.x = REST.x; bird.y = REST.y; bird.a = 0;
+  });
+
+  pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
+  document.getElementById("newBtn").addEventListener("click", reset);
+  window.addEventListener("resize", resize);
+
+  // Keyboard play is desktop-only; phones use gestures on the board.
+  window.addEventListener("keydown", e => {
+    if (phoneMode.matches) return;
+    if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); return; }
+    if (e.key === "r" || e.key === "R") { e.preventDefault(); reset(); }
+  });
+
+  best = loadBest();
+  resize();
+  reset();
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+<script>
+(() => {
+  const btn = document.getElementById("lights");
+  if (!btn) return;
+  const KEY = "arcade.theme.v1";
+  function setTheme(theme) {
+    document.body.dataset.theme = theme;
+    btn.setAttribute("aria-checked", String(theme === "light"));
+    try { localStorage.setItem(KEY, theme); } catch (_) {}
+  }
+  let saved = "dark";
+  try { saved = localStorage.getItem(KEY) || "dark"; } catch (_) {}
+  setTheme(saved === "light" ? "light" : "dark");
+  btn.addEventListener("click", () => {
+    setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>
