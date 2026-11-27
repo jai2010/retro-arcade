@@ -24,6 +24,11 @@
   .msg { min-height:20px; margin:8px 0; font-size:12px; color:var(--muted); }
   .hidden { display:none !important; }
   .actions { display:flex; gap:8px; flex-wrap:wrap; }
+
+  /* Header controls removed from the arcade UI. */
+  #pauseBtn, button[aria-label*="Pause"], [data-action="pause"],
+  button.arcade-action, .tile-actions, .actions .share, .actions .like,
+  .actions .bookmark { display: none !important; }
 </style>
 </head>
 <body>

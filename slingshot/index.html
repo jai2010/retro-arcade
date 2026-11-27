@@ -93,6 +93,11 @@
     -webkit-tap-highlight-color: transparent;
   }
   .board-wrap, canvas { touch-action: none; }
+
+  /* Header controls removed from the arcade UI. */
+  #pauseBtn, button[aria-label*="Pause"], [data-action="pause"],
+  button.arcade-action, .tile-actions, .actions .share, .actions .like,
+  .actions .bookmark { display: none !important; }
 </style>
 </head>
 <body>
@@ -909,7 +914,7 @@
         ? "Tap New game to play again"
         : paused
           ? "Tap Pause to resume"
-          : "Drag the bird back and release to launch";
+          : "Tap anywhere to start · then drag the bird back and release";
       ctx.fillText(hint, W / 2, H / 2 + 18);
       if (gameOver || started) {
         ctx.fillStyle = INK;
@@ -959,6 +964,7 @@
 
   canvas.addEventListener("pointerdown", e => {
     if (paused || gameOver || !bird || bird.active || dragging) return;
+    if (!started) { started = true; announce("Slingshot ready"); }
     const p = pointerPos(e);
     if (Math.hypot(p.x - bird.x, p.y - bird.y) > 32) return;
     e.preventDefault();

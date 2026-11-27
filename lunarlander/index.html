@@ -93,6 +93,11 @@
     -webkit-tap-highlight-color: transparent;
   }
   .board-wrap, canvas { touch-action: none; }
+
+  /* Header controls removed from the arcade UI. */
+  #pauseBtn, button[aria-label*="Pause"], [data-action="pause"],
+  button.arcade-action, .tile-actions, .actions .share, .actions .like,
+  .actions .bookmark { display: none !important; }
 </style>
 </head>
 <body>
@@ -118,6 +123,7 @@
           <span class="chip" id="levelChip">Level <b id="levelText">1/4</b></span>
           <span class="chip" id="fuelChip">Fuel <b id="fuel">100%</b></span>
           <span class="chip best">Best <b id="best">0</b></span>
+          <button type="button" class="chip demo" id="demoBtn">Show me how</button>
         </div>
       </div>
 
@@ -174,6 +180,7 @@
   const GRAVITY = 62;
   const THRUST = 128;
   const BURN = 16;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const KEY = "lunarlander.best.v1";
   // padW: drawn/hitbox pad width; wind: constant horizontal push (px/s²).
   // The pad narrows and the wind grows; later levels start with less fuel.
@@ -199,6 +206,7 @@
   const announceEl = document.getElementById("announce");
   const touchPhone = () => document.documentElement.classList.contains("no-touch-pad");
   let level, lander, terrain, padX, padW, padY, particles, score, best, bests, bestAnnounced;
+  let demo = false, demoStep = "";
   let started, paused, gameOver, landed, showScore, keys, pointer, lastTime;
   // localStorage can be blocked for file:// pages; keep the per-level bests in
   // memory then. The stored value is a small JSON map of level -> best score.
@@ -331,7 +339,22 @@
     }
     if (!started || paused || gameOver || landed) return;
     const hasFuel = lander.fuel > 0;
-    const power = keys.thrust ? 1 : (pointer.down ? pointer.power : 0);
+    let power = keys.thrust ? 1 : (pointer.down ? pointer.power : 0);
+    if (demo) {
+      const alt = Math.max(0, terrainHeight(lander.x) - lander.y - 12);
+      const targetVy = clamp(alt * 0.32, 7, 46);
+      power = clamp(0.48 + (lander.vy - targetVy) * 0.022, 0, 1);
+      const targetX = padX + padW / 2;
+      const desiredVx = clamp((targetX - lander.x) * 0.8, -26, 26);
+      const axWanted = (desiredVx - lander.vx) * 1.4 - LEVELS[level - 1].wind;
+      const targetAngle = alt < 26 ? 0 : clamp(-axWanted / (THRUST * Math.max(0.35, power)), -0.5, 0.5);
+      lander.angle += (targetAngle - lander.angle) * Math.min(1, dt * 5);
+      keys.thrust = power > 0.05;
+      keys.left = false; keys.right = false;
+      demoStep = alt > 90 ? "Thrust gently · steer toward the pad"
+        : alt > 28 ? "Level out · slow the descent"
+          : "Ease down · feet on the pad";
+    }
     lander.thrusting = hasFuel && power > 0.05;
     if (keys.left) lander.angle -= 1.7 * dt;
     if (keys.right) lander.angle += 1.7 * dt;
@@ -374,6 +397,10 @@
         lander.vx = 0; lander.vy = 0;
         puff(lander.x, contact.y, 18, "#3f9b91");
         announce("Landed! Score " + score);
+        if (demo) {
+          demoStep = "Touchdown! Now try it yourself";
+          setTimeout(() => { demo = false; startLevel(1); announce("Your turn"); }, 1400);
+        }
       } else {
         gameOver = true;
         lander.thrusting = false;
@@ -618,7 +645,13 @@
     }
     drawLander();
     drawFuelGauge();
-    if (started && !paused && !gameOver && !landed) {
+    if (demo && started && !paused && !gameOver && !landed) {
+      paintShape(12, 14, 262, 24, 7, PAPER);
+      ctx.font = "9px monospace";
+      ctx.fillStyle = INK;
+      ctx.textAlign = "center";
+      ctx.fillText("DEMO: " + demoStep, 143, 30);
+    } else if (started && !paused && !gameOver && !landed) {
       paintShape(12, 14, 200, 22, 7, PAPER);
       ctx.font = "8px monospace";
       ctx.fillStyle = INK;
@@ -674,11 +707,19 @@
     draw();
     requestAnimationFrame(loop);
   }
+  document.getElementById("demoBtn").addEventListener("click", () => {
+    startLevel(1);
+    demo = true;
+    demoStep = "Thrust gently · steer toward the pad";
+    started = true;
+    announce("Watching a landing demo");
+    canvas.focus({ preventScroll: true });
+  });
   pauseBtn.addEventListener("click", () => { togglePause(); canvas.focus({ preventScroll: true }); });
   document.getElementById("newBtn").addEventListener("click", reset);
   window.addEventListener("resize", resize);
   window.addEventListener("keydown", e => {
-    if (phoneMode.matches) return;
+    if (phoneMode.matches || demo) return;
     if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
       e.preventDefault(); keys.thrust = true; started = true; return;
     }
@@ -706,6 +747,7 @@
   }
   canvas.addEventListener("pointerdown", e => {
     e.preventDefault();
+    if (demo) return;
     // A tap on an end overlay acts as the action shown there.
     if (gameOver || landed) {
       if (gameOver) retryLevel(); else nextLevel();
@@ -734,6 +776,13 @@
   canvas.addEventListener("pointerup", endPointer);
   canvas.addEventListener("pointercancel", endPointer);
   canvas.addEventListener("pointerleave", endPointer);
+  window.__lunar = {
+    state: () => ({
+      x: lander.x, y: lander.y, vx: lander.vx, vy: lander.vy,
+      angle: lander.angle, fuel: lander.fuel, padX, padW, padY,
+      demo, started, landed, gameOver
+    })
+  };
   bests = loadBests();
   level = 1;
   resize();

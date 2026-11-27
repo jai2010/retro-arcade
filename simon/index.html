@@ -441,6 +441,11 @@
     -webkit-tap-highlight-color: transparent;
   }
   .board-wrap, canvas { touch-action: none; }
+
+  /* Header controls removed from the arcade UI. */
+  #pauseBtn, button[aria-label*="Pause"], [data-action="pause"],
+  button.arcade-action, .tile-actions, .actions .share, .actions .like,
+  .actions .bookmark { display: none !important; }
 </style>
 </head>
 <body>

@@ -188,7 +188,6 @@
     host.appendChild(bookmarkBtn);
   }
 
-  document.addEventListener("DOMContentLoaded", installHeaderActions);
 
   window.addEventListener("online", flush);
   setInterval(flush, 60000);
