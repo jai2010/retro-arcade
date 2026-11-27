@@ -111,7 +111,8 @@
     } catch (_) {}
   }
 
-  const game = currentGame();
+  let game = currentGame();
+  if (document.querySelector(".game-card") || document.title === "Offline Arcade") game = "home";
   if (game !== "home") {
     state.views[game] = (state.views[game] || 0) + 1;
     queue("view", game);
@@ -128,6 +129,66 @@
     setTimeout(poll, 1200);
     setInterval(poll, 5000);
   }
+
+  /* Header actions: Share everywhere, Like and Bookmark inside games.
+   * Injected so the thumbnails stay clean and each game file stays self-contained. */
+  const ACTION_CSS =
+    "button.arcade-action{min-width:36px;min-height:36px;padding:4px 8px;" +
+    "border:2px solid currentColor;border-radius:8px;background:transparent;color:inherit;" +
+    "font:700 13px/1 var(--retro-font,monospace);text-transform:none;letter-spacing:0;" +
+    "box-shadow:none;cursor:pointer}" +
+    "button.arcade-action:hover{opacity:.75}" +
+    "button.arcade-action[aria-pressed='true']{color:#e5724c}" +
+    "@media(max-width:760px){button.arcade-action{min-width:26px!important;min-height:30px!important;" +
+    "padding:2px 3px!important;font-size:10px!important}" +
+    "button.arcade-action+button.arcade-action{margin-left:-2px}}";
+
+  function action(label, aria, handler, toggle) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "arcade-action";
+    b.textContent = label;
+    b.setAttribute("aria-label", aria);
+    if (toggle !== undefined) b.setAttribute("aria-pressed", String(!!toggle));
+    b.addEventListener("click", e => { e.preventDefault(); handler(b); });
+    return b;
+  }
+
+  function share(url, title) {
+    if (navigator.share) return navigator.share({ title, url }).catch(() => {});
+    if (navigator.clipboard) {
+      return navigator.clipboard.writeText(url).then(() => {
+        const b = document.querySelector("button.arcade-action.share");
+        if (b) { b.textContent = "✓"; setTimeout(() => { b.textContent = "↗"; }, 1200); }
+      }).catch(() => {});
+    }
+    location.href = "mailto:?subject=" + encodeURIComponent(title) + "&body=" + encodeURIComponent(url);
+  }
+
+  function installHeaderActions() {
+    const style = document.createElement("style");
+    style.textContent = ACTION_CSS;
+    document.head.appendChild(style);
+    const host = document.querySelector(".actions") || document.querySelector(".marquee") || document.querySelector("header");
+    if (!host) return;
+    const url = location.href.split("#")[0];
+    const shareBtn = action("↗", "Share", () => share(url, document.title || "Retro Arcade"));
+    shareBtn.classList.add("share");
+    host.appendChild(shareBtn);
+    if (game === "home") return;
+    const likeBtn = action("♡", "Like " + game, () => {
+      setFlag("likes", game, !state.likes[game]);
+      likeBtn.setAttribute("aria-pressed", String(!!state.likes[game]));
+    }, state.likes[game]);
+    const bookmarkBtn = action("★", "Bookmark " + game, () => {
+      setFlag("bookmarks", game, !state.bookmarks[game]);
+      bookmarkBtn.setAttribute("aria-pressed", String(!!state.bookmarks[game]));
+    }, state.bookmarks[game]);
+    host.appendChild(likeBtn);
+    host.appendChild(bookmarkBtn);
+  }
+
+  document.addEventListener("DOMContentLoaded", installHeaderActions);
 
   window.addEventListener("online", flush);
   setInterval(flush, 60000);

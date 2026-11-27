@@ -62,9 +62,10 @@ No internet connection is required.
 - Usage is recorded offline first in `localStorage`: views, plays, likes, bookmarks
   and best scores. `metrics.js` queues events on every device, and sends the queue
   to `/api/metrics` when the device is online and a sync server is configured.
-- Home-page tiles show views, plays, likes and best score, with like, bookmark
-  (star) and share buttons. Tiles can be filtered by category: All, Classics,
-  Puzzle, Action and Racing.
+- Home-page tiles stay clean artwork only. Tiles can be filtered by category:
+  All, Classics, Puzzle, Action and Racing.
+- Share appears in the home header; Share, Like and Bookmark appear in each game
+  header. Stats remain available in the admin panel.
 - For local development, run `npm install` then `npm start` and open
   `http://localhost:3000`. The admin panel is at `/admin.html` (default password
   `arcade-admin`, override with `ADMIN_PASSWORD`).
